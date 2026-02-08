@@ -12,19 +12,49 @@ dotenv.config();
 const app = express();
 const server = http.createServer(app);
 
+// Allowed origins for CORS
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:3001',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 // Socket.io setup
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:3000', 'http://localhost:3001'],
+    origin: allowedOrigins,
     methods: ['GET', 'POST']
   }
 });
 
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Connect to MongoDB (cached for serverless)
+let isConnected = false;
+const connectDB = async () => {
+  if (isConnected) return;
+  try {
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/market-cairo');
+    isConnected = true;
+    console.log('MongoDB connected successfully');
+  } catch (error) {
+    console.error('MongoDB connection error:', error.message);
+    if (!process.env.VERCEL) process.exit(1);
+  }
+};
+
+// Ensure DB connection before every request (for serverless)
+app.use(async (req, res, next) => {
+  await connectDB();
+  next();
+});
 
 // Import routes
 const authRoutes = require('./routes/auth');
@@ -106,53 +136,44 @@ io.on('connection', (socket) => {
 // Make io accessible to routes
 app.set('io', io);
 
-// Connect to MongoDB
-const connectDB = async () => {
-  try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/market-cairo');
-    console.log('MongoDB connected successfully');
-  } catch (error) {
-    console.error('MongoDB connection error:', error.message);
-    process.exit(1);
-  }
-};
+// Only start server in local dev (not on Vercel)
+if (!process.env.VERCEL) {
+  const PORT = process.env.PORT || 5000;
 
-// Start server
-const PORT = process.env.PORT || 5000;
+  const startServer = async () => {
+    await connectDB();
+    server.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
 
-const startServer = async () => {
-  await connectDB();
-  server.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-  });
+    // Initialize cleanup job after DB connection
+    const Listing = require('./models/Listing');
 
-  // Initialize cleanup job after DB connection
-  const Listing = require('./models/Listing');
+    const cleanupDeletedListings = async () => {
+      try {
+        const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
 
-  const cleanupDeletedListings = async () => {
-    try {
-      const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+        const result = await Listing.deleteMany({
+          isDeleted: true,
+          deletedAt: { $lte: twoDaysAgo }
+        });
 
-      const result = await Listing.deleteMany({
-        isDeleted: true,
-        deletedAt: { $lte: twoDaysAgo }
-      });
-
-      if (result.deletedCount > 0) {
-        console.log(`[CLEANUP] Permanently deleted ${result.deletedCount} expired listings`);
+        if (result.deletedCount > 0) {
+          console.log(`[CLEANUP] Permanently deleted ${result.deletedCount} expired listings`);
+        }
+      } catch (error) {
+        console.error('[CLEANUP] Error deleting expired listings:', error);
       }
-    } catch (error) {
-      console.error('[CLEANUP] Error deleting expired listings:', error);
-    }
+    };
+
+    // Run cleanup every hour
+    setInterval(cleanupDeletedListings, 60 * 60 * 1000);
+
+    // Run immediately on startup
+    cleanupDeletedListings();
   };
 
-  // Run cleanup every hour
-  setInterval(cleanupDeletedListings, 60 * 60 * 1000);
-
-  // Run immediately on startup
-  cleanupDeletedListings();
-};
-
-startServer();
+  startServer();
+}
 
 module.exports = { app, io };
