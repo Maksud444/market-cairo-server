@@ -41,7 +41,7 @@ let isConnected = false;
 const connectDB = async () => {
   if (isConnected) return;
   try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/market-cairo');
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/mysouqify');
     isConnected = true;
     console.log('MongoDB connected successfully');
   } catch (error) {
@@ -76,12 +76,12 @@ app.use('/api/verification', verificationRoutes);
 
 // Root route
 app.get('/', (req, res) => {
-  res.json({ status: 'ok', message: 'Market Cairo API is running', docs: '/api/health' });
+  res.json({ status: 'ok', message: 'MySouqify API is running', docs: '/api/health' });
 });
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'Market Cairo API is running' });
+  res.json({ status: 'ok', message: 'MySouqify API is running' });
 });
 
 // Socket.io connection handling

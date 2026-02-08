@@ -15,13 +15,13 @@ const sendVerificationApproved = async (email, name) => {
 
   try {
     await transporter.sendMail({
-      from: `"Market Cairo" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      from: `"MySouqify" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
       to: email,
       subject: 'Identity Verification Approved ✓',
       html: `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
           <h2 style="color:#16a34a;">Congratulations ${name}!</h2>
-          <p>Your identity verification has been <strong>approved</strong>. You can now post listings on Market Cairo.</p>
+          <p>Your identity verification has been <strong>approved</strong>. You can now post listings on MySouqify.</p>
           <a href="${frontendUrl}/post" style="display:inline-block;padding:12px 24px;background:#E00000;color:#fff;text-decoration:none;border-radius:8px;margin-top:16px;">Post Your First Ad</a>
           <p style="margin-top:20px;color:#666;">Thank you for being a trusted member of our community!</p>
         </div>
@@ -38,7 +38,7 @@ const sendVerificationRejected = async (email, name, reason) => {
 
   try {
     await transporter.sendMail({
-      from: `"Market Cairo" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      from: `"MySouqify" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
       to: email,
       subject: 'Identity Verification - Action Required',
       html: `
@@ -65,7 +65,7 @@ const sendListingApproved = async (email, name, listingTitle) => {
 
   try {
     await transporter.sendMail({
-      from: `"Market Cairo" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      from: `"MySouqify" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
       to: email,
       subject: `Your listing "${listingTitle}" is now live!`,
       html: `
@@ -88,7 +88,7 @@ const sendListingRejected = async (email, name, listingTitle, reason) => {
 
   try {
     await transporter.sendMail({
-      from: `"Market Cairo" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      from: `"MySouqify" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
       to: email,
       subject: `Listing "${listingTitle}" - Action Required`,
       html: `

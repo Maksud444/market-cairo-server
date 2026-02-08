@@ -1,7 +1,7 @@
 {
-  "name": "market-cairo-backend",
+  "name": "mysouqify-server",
   "version": "1.0.0",
-  "description": "Backend API for Market Cairo - Egyptian Second-hand Marketplace",
+  "description": "Backend API for MySouqify - Egyptian Second-hand Marketplace",
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",

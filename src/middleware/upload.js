@@ -1,11 +1,23 @@
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
+const fsPromises = require('fs').promises;
 const { compressMultipleImages } = require('../utils/imageCompression');
+
+// Upload directory: /tmp on Vercel (read-only filesystem), local uploads/ otherwise
+const uploadDir = process.env.VERCEL
+  ? '/tmp'
+  : path.join(__dirname, '../../uploads');
+
+// Ensure upload directory exists (local dev)
+if (!process.env.VERCEL && !fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
 
 // Configure storage
 const storage = multer.diskStorage({
   destination: function(req, file, cb) {
-    cb(null, path.join(__dirname, '../../uploads'));
+    cb(null, uploadDir);
   },
   filename: function(req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -16,7 +28,7 @@ const storage = multer.diskStorage({
 // File filter
 const fileFilter = (req, file, cb) => {
   const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-  
+
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
@@ -54,14 +66,14 @@ const handleUploadErrors = (err, req, res, next) => {
       message: err.message
     });
   }
-  
+
   if (err) {
     return res.status(400).json({
       success: false,
       message: err.message
     });
   }
-  
+
   next();
 };
 
@@ -91,4 +103,24 @@ const compressImages = async (req, res, next) => {
   }
 };
 
-module.exports = { upload, handleUploadErrors, compressImages };
+// Convert uploaded files to base64 data URLs (for Vercel serverless - no persistent filesystem)
+const convertToDataUrl = async (req, res, next) => {
+  if (!process.env.VERCEL || !req.files || req.files.length === 0) {
+    return next();
+  }
+
+  try {
+    for (const file of req.files) {
+      const buffer = await fsPromises.readFile(file.path);
+      file.dataUrl = `data:${file.mimetype};base64,${buffer.toString('base64')}`;
+      // Clean up temp file
+      await fsPromises.unlink(file.path).catch(() => {});
+    }
+    next();
+  } catch (error) {
+    console.error('[UPLOAD] Data URL conversion failed:', error);
+    next();
+  }
+};
+
+module.exports = { upload, handleUploadErrors, compressImages, convertToDataUrl };

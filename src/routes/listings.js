@@ -4,7 +4,7 @@ const { body, query, validationResult } = require('express-validator');
 const Listing = require('../models/Listing');
 const User = require('../models/User');
 const { protect, optionalAuth, verifiedOnly } = require('../middleware/auth');
-const { upload, handleUploadErrors, compressImages } = require('../middleware/upload');
+const { upload, handleUploadErrors, compressImages, convertToDataUrl } = require('../middleware/upload');
 
 // @route   GET /api/listings
 // @desc    Get all listings with filters, search, and pagination
@@ -65,6 +65,10 @@ router.get('/', optionalAuth, async (req, res) => {
       case 'popular':
         sortOption = { views: -1 };
         break;
+      case 'oldest':
+        sortOption = { createdAt: 1 };
+        break;
+      case 'newest':
       case 'recent':
       default:
         sortOption = { createdAt: -1 };
@@ -328,7 +332,7 @@ router.get('/:id/similar', async (req, res) => {
 // @route   POST /api/listings
 // @desc    Create new listing
 // @access  Private
-router.post('/', protect, verifiedOnly, upload.array('images', 10), compressImages, handleUploadErrors, [
+router.post('/', protect, verifiedOnly, upload.array('images', 10), compressImages, convertToDataUrl, handleUploadErrors, [
   body('title').trim().notEmpty().withMessage('Title is required'),
   body('description').trim().notEmpty().withMessage('Description is required'),
   body('price').isNumeric().withMessage('Valid price is required'),
@@ -353,9 +357,9 @@ router.post('/', protect, verifiedOnly, upload.array('images', 10), compressImag
 
     const { title, description, price, category, condition, location } = req.body;
 
-    // Process uploaded images
+    // Process uploaded images (dataUrl for Vercel, file path for local)
     const images = req.files ? req.files.map(file => ({
-      url: `/uploads/${file.filename}`,
+      url: file.dataUrl || `/uploads/${file.filename}`,
       filename: file.filename
     })) : [];
 
@@ -401,7 +405,7 @@ router.post('/', protect, verifiedOnly, upload.array('images', 10), compressImag
 // @route   PUT /api/listings/:id
 // @desc    Update listing
 // @access  Private (owner only)
-router.put('/:id', protect, upload.array('images', 10), compressImages, handleUploadErrors, async (req, res) => {
+router.put('/:id', protect, upload.array('images', 10), compressImages, convertToDataUrl, handleUploadErrors, async (req, res) => {
   try {
     let listing = await Listing.findById(req.params.id);
 
@@ -431,10 +435,10 @@ router.put('/:id', protect, upload.array('images', 10), compressImages, handleUp
     if (location) updateData.location = typeof location === 'string' ? JSON.parse(location) : location;
     if (status) updateData.status = status;
 
-    // Add new images if uploaded
+    // Add new images if uploaded (dataUrl for Vercel, file path for local)
     if (req.files && req.files.length > 0) {
       const newImages = req.files.map(file => ({
-        url: `/uploads/${file.filename}`,
+        url: file.dataUrl || `/uploads/${file.filename}`,
         filename: file.filename
       }));
       updateData.images = [...(listing.images || []), ...newImages];

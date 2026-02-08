@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { protect } = require('../middleware/auth');
-const { upload, handleUploadErrors, compressImages } = require('../middleware/upload');
+const { upload, handleUploadErrors, compressImages, convertToDataUrl } = require('../middleware/upload');
 const User = require('../models/User');
 
 // @route   GET /api/verification/status
@@ -24,7 +24,7 @@ router.get('/status', protect, async (req, res) => {
 // @route   POST /api/verification/submit
 // @desc    Submit identity verification documents
 // @access  Private
-router.post('/submit', protect, upload.array('documents', 2), compressImages, handleUploadErrors, async (req, res) => {
+router.post('/submit', protect, upload.array('documents', 2), compressImages, convertToDataUrl, handleUploadErrors, async (req, res) => {
   try {
     const { documentType } = req.body;
 
@@ -58,7 +58,7 @@ router.post('/submit', protect, upload.array('documents', 2), compressImages, ha
     }
 
     const documentImages = req.files.map(file => ({
-      url: `/uploads/${file.filename}`,
+      url: file.dataUrl || `/uploads/${file.filename}`,
       filename: file.filename
     }));
 
