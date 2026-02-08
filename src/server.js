@@ -74,6 +74,11 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/verification', verificationRoutes);
 
+// Root route
+app.get('/', (req, res) => {
+  res.json({ status: 'ok', message: 'Market Cairo API is running', docs: '/api/health' });
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'Market Cairo API is running' });
