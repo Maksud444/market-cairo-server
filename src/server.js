@@ -16,7 +16,9 @@ const server = http.createServer(app);
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
-  process.env.FRONTEND_URL
+  process.env.FRONTEND_URL,
+  // Support comma-separated list of additional origins
+  ...(process.env.EXTRA_ORIGINS ? process.env.EXTRA_ORIGINS.split(',').map(o => o.trim()) : [])
 ].filter(Boolean);
 
 // Socket.io setup
