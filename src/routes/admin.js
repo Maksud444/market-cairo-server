@@ -3,6 +3,7 @@ const router = express.Router();
 const { protect, adminOnly } = require('../middleware/auth');
 const User = require('../models/User');
 const Listing = require('../models/Listing');
+const Category = require('../models/Category');
 
 // All routes require authentication and admin role
 router.use(protect);
@@ -567,6 +568,119 @@ router.put('/verifications/:userId/review', async (req, res) => {
   } catch (error) {
     console.error('Review verification error:', error);
     res.status(500).json({ success: false, message: 'Failed to review verification' });
+  }
+});
+
+// ─── Category Management ───────────────────────────────────────────────────
+
+// @route   POST /api/admin/categories/seed
+// @desc    Seed default categories (only if DB is empty)
+// @access  Admin
+router.post('/categories/seed', async (req, res) => {
+  try {
+    const count = await Category.countDocuments();
+    if (count > 0) {
+      return res.json({ success: true, message: 'Categories already seeded', count });
+    }
+    const defaults = [
+      { name: 'Mobile & Tablets', icon: 'smartphone', slug: 'mobile-tablets', order: 0,
+        subcategories: [
+          { name: 'Mobile Phones', subcategories: [] }, { name: 'Tablets', subcategories: [] },
+          { name: 'Mobile & Tablet Accessories', subcategories: [] }, { name: 'Smart Watches', subcategories: [] }
+        ]
+      },
+      { name: 'Electronics', icon: 'monitor', slug: 'electronics', order: 1,
+        subcategories: [
+          { name: 'TV, Audio & Video', subcategories: [] }, { name: 'Computers & Laptops', subcategories: [] },
+          { name: 'Video Games', subcategories: [] }, { name: 'Cameras', subcategories: [] }
+        ]
+      },
+      { name: 'Fashion & Beauty', icon: 'shirt', slug: 'fashion-beauty', order: 2,
+        subcategories: [
+          { name: "Women's Clothing", subcategories: [] }, { name: "Men's Clothing", subcategories: [] },
+          { name: "Women's Accessories", subcategories: [] }, { name: 'Cosmetics', subcategories: [] },
+          { name: 'Personal Care', subcategories: [] }, { name: "Men's Accessories", subcategories: [] }
+        ]
+      },
+      { name: 'Furniture', icon: 'sofa', slug: 'furniture', order: 3, subcategories: [] },
+      { name: 'Kitchen', icon: 'utensils', slug: 'kitchen', order: 4, subcategories: [] },
+      { name: 'Books', icon: 'book', slug: 'books', order: 5, subcategories: [] },
+      { name: 'Other', icon: 'box', slug: 'other', order: 6, subcategories: [] }
+    ];
+    await Category.insertMany(defaults);
+    res.json({ success: true, message: 'Categories seeded', count: defaults.length });
+  } catch (error) {
+    console.error('Seed categories error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/admin/categories
+// @desc    Get all categories (including inactive)
+// @access  Admin
+router.get('/categories', async (req, res) => {
+  try {
+    const categories = await Category.find().sort({ order: 1, name: 1 });
+    res.json({ success: true, categories });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   POST /api/admin/categories
+// @desc    Create a new category
+// @access  Admin
+router.post('/categories', async (req, res) => {
+  try {
+    const { name, icon, slug, subcategories, order } = req.body;
+    if (!name || !slug) {
+      return res.status(400).json({ success: false, message: 'Name and slug are required' });
+    }
+    const existing = await Category.findOne({ $or: [{ name }, { slug }] });
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Category name or slug already exists' });
+    }
+    const category = await Category.create({ name, icon: icon || 'box', slug, subcategories: subcategories || [], order: order || 0 });
+    res.status(201).json({ success: true, category });
+  } catch (error) {
+    console.error('Create category error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   PUT /api/admin/categories/:id
+// @desc    Update a category
+// @access  Admin
+router.put('/categories/:id', async (req, res) => {
+  try {
+    const { name, icon, slug, subcategories, order, isActive } = req.body;
+    const category = await Category.findByIdAndUpdate(
+      req.params.id,
+      { name, icon, slug, subcategories, order, isActive },
+      { new: true, runValidators: true }
+    );
+    if (!category) {
+      return res.status(404).json({ success: false, message: 'Category not found' });
+    }
+    res.json({ success: true, category });
+  } catch (error) {
+    console.error('Update category error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/admin/categories/:id
+// @desc    Delete a category
+// @access  Admin
+router.delete('/categories/:id', async (req, res) => {
+  try {
+    const category = await Category.findByIdAndDelete(req.params.id);
+    if (!category) {
+      return res.status(404).json({ success: false, message: 'Category not found' });
+    }
+    res.json({ success: true, message: 'Category deleted' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

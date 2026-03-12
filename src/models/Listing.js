@@ -20,7 +20,10 @@ const listingSchema = new mongoose.Schema({
   category: {
     type: String,
     required: [true, 'Please select a category'],
-    enum: ['Furniture', 'Electronics', 'Books', 'Kitchen', 'Clothing', 'Sports', 'Toys', 'Other']
+  },
+  subcategory: {
+    type: String,
+    default: ''
   },
   condition: {
     type: String,

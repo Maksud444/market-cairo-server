@@ -1,53 +1,69 @@
 const express = require('express');
 const router = express.Router();
 const Listing = require('../models/Listing');
+const Category = require('../models/Category');
 
-// Category definitions with icons
-const categories = [
-  { name: 'Furniture', icon: 'sofa', slug: 'furniture' },
-  { name: 'Electronics', icon: 'laptop', slug: 'electronics' },
-  { name: 'Books', icon: 'book', slug: 'books' },
-  { name: 'Kitchen', icon: 'utensils', slug: 'kitchen' },
-  { name: 'Clothing', icon: 'shirt', slug: 'clothing' },
-  { name: 'Sports', icon: 'dumbbell', slug: 'sports' },
-  { name: 'Toys', icon: 'gamepad', slug: 'toys' },
-  { name: 'Other', icon: 'box', slug: 'other' }
+// Default categories used as fallback if DB is empty
+const defaultCategories = [
+  { name: 'Mobile & Tablets', icon: 'smartphone', slug: 'mobile-tablets', order: 0,
+    subcategories: [
+      { name: 'Mobile Phones', subcategories: [] },
+      { name: 'Tablets', subcategories: [] },
+      { name: 'Mobile & Tablet Accessories', subcategories: [] },
+      { name: 'Smart Watches', subcategories: [] }
+    ]
+  },
+  { name: 'Electronics', icon: 'monitor', slug: 'electronics', order: 1,
+    subcategories: [
+      { name: 'TV, Audio & Video', subcategories: [] },
+      { name: 'Computers & Laptops', subcategories: [] },
+      { name: 'Video Games', subcategories: [] },
+      { name: 'Cameras', subcategories: [] }
+    ]
+  },
+  { name: 'Fashion & Beauty', icon: 'shirt', slug: 'fashion-beauty', order: 2,
+    subcategories: [
+      { name: "Women's Clothing", subcategories: [] },
+      { name: "Men's Clothing", subcategories: [] },
+      { name: "Women's Accessories", subcategories: [] },
+      { name: 'Cosmetics', subcategories: [] },
+      { name: 'Personal Care', subcategories: [] },
+      { name: "Men's Accessories", subcategories: [] }
+    ]
+  },
+  { name: 'Furniture', icon: 'sofa', slug: 'furniture', order: 3, subcategories: [] },
+  { name: 'Kitchen', icon: 'utensils', slug: 'kitchen', order: 4, subcategories: [] },
+  { name: 'Books', icon: 'book', slug: 'books', order: 5, subcategories: [] },
+  { name: 'Other', icon: 'box', slug: 'other', order: 6, subcategories: [] }
 ];
 
 // Location areas in Cairo
 const locations = [
-  'Maadi',
-  'New Cairo',
-  'Zamalek',
-  'Downtown',
-  'Heliopolis',
-  'Nasr City',
-  'Sheikh Zayed',
-  '6th of October',
-  'Giza',
-  'Mohandessin',
-  'Dokki',
-  'Tagamoa',
-  'Rehab',
-  'Madinet Nasr',
-  'El Mokattam',
-  'Ain Shams',
-  'Shubra',
-  'Other'
+  'Maadi', 'New Cairo', 'Zamalek', 'Downtown', 'Heliopolis',
+  'Nasr City', 'Sheikh Zayed', '6th of October', 'Giza',
+  'Mohandessin', 'Dokki', 'Tagamoa', 'Rehab', 'Madinet Nasr',
+  'El Mokattam', 'Ain Shams', 'Shubra', 'Other'
 ];
 
 // Conditions
 const conditions = ['New', 'Like New', 'Good', 'Fair'];
+
+async function getCategories() {
+  const dbCats = await Category.find({ isActive: true }).sort({ order: 1, name: 1 });
+  return dbCats.length > 0 ? dbCats : defaultCategories;
+}
 
 // @route   GET /api/categories
 // @desc    Get all categories with listing counts
 // @access  Public
 router.get('/', async (req, res) => {
   try {
-    // Get counts for each category
-    const categoryCounts = await Listing.aggregate([
-      { $match: { status: 'active', moderationStatus: 'approved' } },
-      { $group: { _id: '$category', count: { $sum: 1 } } }
+    const [cats, categoryCounts] = await Promise.all([
+      getCategories(),
+      Listing.aggregate([
+        { $match: { status: 'active', moderationStatus: 'approved' } },
+        { $group: { _id: '$category', count: { $sum: 1 } } }
+      ])
     ]);
 
     const countsMap = categoryCounts.reduce((acc, cat) => {
@@ -55,53 +71,44 @@ router.get('/', async (req, res) => {
       return acc;
     }, {});
 
-    const categoriesWithCounts = categories.map(cat => ({
-      ...cat,
+    const categoriesWithCounts = cats.map(cat => ({
+      _id: cat._id,
+      name: cat.name,
+      icon: cat.icon,
+      slug: cat.slug,
+      subcategories: cat.subcategories,
       count: countsMap[cat.name] || 0
     }));
 
-    res.json({
-      success: true,
-      categories: categoriesWithCounts
-    });
+    res.json({ success: true, categories: categoriesWithCounts });
   } catch (error) {
     console.error('Get categories error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 // @route   GET /api/categories/locations
-// @desc    Get all location areas
 // @access  Public
 router.get('/locations', (req, res) => {
-  res.json({
-    success: true,
-    locations
-  });
+  res.json({ success: true, locations });
 });
 
 // @route   GET /api/categories/conditions
-// @desc    Get all condition options
 // @access  Public
 router.get('/conditions', (req, res) => {
-  res.json({
-    success: true,
-    conditions
-  });
+  res.json({ success: true, conditions });
 });
 
 // @route   GET /api/categories/filters
-// @desc    Get all filter options
 // @access  Public
 router.get('/filters', async (req, res) => {
   try {
-    // Get counts for each category
-    const categoryCounts = await Listing.aggregate([
-      { $match: { status: 'active', moderationStatus: 'approved' } },
-      { $group: { _id: '$category', count: { $sum: 1 } } }
+    const [cats, categoryCounts] = await Promise.all([
+      getCategories(),
+      Listing.aggregate([
+        { $match: { status: 'active', moderationStatus: 'approved' } },
+        { $group: { _id: '$category', count: { $sum: 1 } } }
+      ])
     ]);
 
     const countsMap = categoryCounts.reduce((acc, cat) => {
@@ -109,23 +116,19 @@ router.get('/filters', async (req, res) => {
       return acc;
     }, {});
 
-    const categoriesWithCounts = categories.map(cat => ({
-      ...cat,
+    const categoriesWithCounts = cats.map(cat => ({
+      _id: cat._id,
+      name: cat.name,
+      icon: cat.icon,
+      slug: cat.slug,
+      subcategories: cat.subcategories,
       count: countsMap[cat.name] || 0
     }));
 
-    res.json({
-      success: true,
-      categories: categoriesWithCounts,
-      locations,
-      conditions
-    });
+    res.json({ success: true, categories: categoriesWithCounts, locations, conditions });
   } catch (error) {
     console.error('Get filters error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
