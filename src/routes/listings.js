@@ -13,6 +13,7 @@ router.get('/', optionalAuth, async (req, res) => {
   try {
     const {
       category,
+      subcategory,
       condition,
       minPrice,
       maxPrice,
@@ -39,6 +40,7 @@ router.get('/', optionalAuth, async (req, res) => {
     ];
 
     if (category) andConditions.push({ category });
+    if (subcategory) andConditions.push({ subcategory });
     if (condition) andConditions.push({ condition });
     if (location) andConditions.push({ 'location.area': location });
     if (seller) andConditions.push({ seller });
