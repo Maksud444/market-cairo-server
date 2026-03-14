@@ -37,12 +37,57 @@ const defaultCategories = [
   { name: 'Other', icon: 'box', slug: 'other', order: 6, subcategories: [] }
 ];
 
-// Location areas in Cairo
+// Location areas in Cairo (Dubizzle-style with EN + AR)
 const locations = [
-  'Maadi', 'New Cairo', 'Zamalek', 'Downtown', 'Heliopolis',
-  'Nasr City', 'Sheikh Zayed', '6th of October', 'Giza',
-  'Mohandessin', 'Dokki', 'Tagamoa', 'Rehab', 'Madinet Nasr',
-  'El Mokattam', 'Ain Shams', 'Shubra', 'Other'
+  // East Greater Cairo
+  { en: 'New Cairo', ar: 'القاهرة الجديدة' },
+  { en: '5th Settlement', ar: 'التجمع الخامس' },
+  { en: 'Madinaty', ar: 'مدينتي' },
+  { en: 'Rehab City', ar: 'مدينة الرحاب' },
+  { en: 'Shorouk City', ar: 'مدينة الشروق' },
+  { en: 'Mostakbal City', ar: 'مدينة المستقبل' },
+  { en: 'New Administrative Capital', ar: 'العاصمة الإدارية الجديدة' },
+  { en: 'Obour City', ar: 'مدينة العبور' },
+  { en: 'Badr City', ar: 'مدينة بدر' },
+  // Central East
+  { en: 'Nasr City', ar: 'مدينة نصر' },
+  { en: 'Heliopolis', ar: 'مصر الجديدة' },
+  { en: 'Nozha', ar: 'النزهة' },
+  { en: 'New Nozha', ar: 'النزهة الجديدة' },
+  { en: 'Sheraton', ar: 'شيراتون' },
+  { en: 'Ain Shams', ar: 'عين شمس' },
+  { en: 'Matareya', ar: 'المطرية' },
+  { en: 'Gesr Al Suez', ar: 'جسر السويس' },
+  { en: 'Salam City', ar: 'مدينة السلام' },
+  { en: 'Hadayek el-Kobba', ar: 'حدائق القبة' },
+  { en: 'Marg', ar: 'المرج' },
+  // Central Cairo
+  { en: 'Downtown', ar: 'وسط البلد' },
+  { en: 'Garden City', ar: 'جاردن سيتي' },
+  { en: 'Zamalek', ar: 'الزمالك' },
+  { en: 'Shubra', ar: 'شبرا' },
+  { en: 'Rod al-Farag', ar: 'روض الفرج' },
+  { en: 'Abasiya', ar: 'العباسية' },
+  { en: 'Old Cairo', ar: 'مصر القديمة' },
+  // South Cairo
+  { en: 'Maadi', ar: 'المعادي' },
+  { en: 'Zahraa Al Maadi', ar: 'زهراء المعادي' },
+  { en: 'Basateen', ar: 'البساتين' },
+  { en: 'Helwan', ar: 'حلوان' },
+  { en: 'Katameya', ar: 'الكاتمية' },
+  { en: 'Mokattam', ar: 'المقطم' },
+  { en: '15 May City', ar: 'مدينة 15 مايو' },
+  // West / Giza
+  { en: 'Giza', ar: 'الجيزة' },
+  { en: 'Dokki', ar: 'الدقي' },
+  { en: 'Mohandessin', ar: 'المهندسين' },
+  { en: 'Agouza', ar: 'العجوزة' },
+  { en: 'Haram', ar: 'الهرم' },
+  { en: 'Faisal', ar: 'فيصل' },
+  { en: 'Sheikh Zayed', ar: 'الشيخ زايد' },
+  { en: '6th of October', ar: 'السادس من أكتوبر' },
+  { en: 'Hadayek October', ar: 'حدائق أكتوبر' },
+  { en: 'Other', ar: 'أخرى' },
 ];
 
 // Conditions
