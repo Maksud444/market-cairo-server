@@ -27,31 +27,42 @@ router.get('/', optionalAuth, async (req, res) => {
 
     // Build query - include soft-deleted items within 2 days
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
-    const queryObj = {
-      moderationStatus: 'approved',
-      $or: [
-        { status: 'active', isDeleted: { $ne: true } }, // Active & not deleted
-        { isDeleted: true, deletedAt: { $gt: twoDaysAgo } } // Soft-deleted within 2 days (status may be 'sold')
-      ]
-    };
 
-    if (category) queryObj.category = category;
-    if (condition) queryObj.condition = condition;
-    if (location) queryObj['location.area'] = location;
-    if (seller) queryObj.seller = seller;
-    if (featured === 'true') queryObj.featured = true;
+    const andConditions = [
+      { moderationStatus: 'approved' },
+      {
+        $or: [
+          { status: 'active', isDeleted: { $ne: true } },
+          { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
+        ]
+      }
+    ];
+
+    if (category) andConditions.push({ category });
+    if (condition) andConditions.push({ condition });
+    if (location) andConditions.push({ 'location.area': location });
+    if (seller) andConditions.push({ seller });
+    if (featured === 'true') andConditions.push({ featured: true });
 
     // Price filter
     if (minPrice || maxPrice) {
-      queryObj.price = {};
-      if (minPrice) queryObj.price.$gte = Number(minPrice);
-      if (maxPrice) queryObj.price.$lte = Number(maxPrice);
+      const priceFilter = {};
+      if (minPrice) priceFilter.$gte = Number(minPrice);
+      if (maxPrice) priceFilter.$lte = Number(maxPrice);
+      andConditions.push({ price: priceFilter });
     }
 
-    // Text search
+    // Text search using regex (works without text index)
     if (search) {
-      queryObj.$text = { $search: search };
+      andConditions.push({
+        $or: [
+          { title: { $regex: search, $options: 'i' } },
+          { description: { $regex: search, $options: 'i' } }
+        ]
+      });
     }
+
+    const queryObj = { $and: andConditions };
 
     // Sort options
     let sortOption = {};
@@ -79,7 +90,7 @@ router.get('/', optionalAuth, async (req, res) => {
 
     // Execute query
     const listings = await Listing.find(queryObj)
-      .populate('seller', 'name avatar rating')
+      .populate('seller', 'name avatar rating phone')
       .sort(sortOption)
       .skip(skip)
       .limit(Number(limit));
@@ -120,7 +131,7 @@ router.get('/featured', async (req, res) => {
         { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
       ]
     })
-      .populate('seller', 'name avatar rating')
+      .populate('seller', 'name avatar rating phone')
       .sort({ createdAt: -1 })
       .limit(8);
 
@@ -152,7 +163,7 @@ router.get('/recent', async (req, res) => {
         { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
       ]
     })
-      .populate('seller', 'name avatar rating')
+      .populate('seller', 'name avatar rating phone')
       .sort({ createdAt: -1 })
       .limit(Number(limit));
 
@@ -312,7 +323,7 @@ router.get('/:id/similar', async (req, res) => {
         { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
       ]
     })
-      .populate('seller', 'name avatar rating')
+      .populate('seller', 'name avatar rating phone')
       .sort({ createdAt: -1 })
       .limit(4);
 
@@ -374,7 +385,7 @@ router.post('/', protect, verifiedOnly, upload.array('images', 10), compressImag
       seller: req.user._id
     });
 
-    await listing.populate('seller', 'name avatar rating');
+    await listing.populate('seller', 'name avatar rating phone');
 
     res.status(201).json({
       success: true,
@@ -448,7 +459,7 @@ router.put('/:id', protect, upload.array('images', 10), compressImages, convertT
       req.params.id,
       updateData,
       { new: true, runValidators: true }
-    ).populate('seller', 'name avatar rating');
+    ).populate('seller', 'name avatar rating phone');
 
     res.json({
       success: true,
