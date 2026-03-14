@@ -103,9 +103,9 @@ const compressImages = async (req, res, next) => {
   }
 };
 
-// Convert uploaded files to base64 data URLs (for Vercel serverless - no persistent filesystem)
+// Convert uploaded files to base64 data URLs (always, since container filesystem is ephemeral)
 const convertToDataUrl = async (req, res, next) => {
-  if (!process.env.VERCEL || !req.files || req.files.length === 0) {
+  if (!req.files || req.files.length === 0) {
     return next();
   }
 
