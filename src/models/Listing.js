@@ -38,17 +38,15 @@ const listingSchema = new mongoose.Schema({
     area: {
       type: String,
       required: [true, 'Please provide location area'],
-      enum: [
-        'Maadi', 'New Cairo', 'Zamalek', 'Downtown', 'Heliopolis', 
-        'Nasr City', 'Sheikh Zayed', '6th of October', 'Giza', 
-        'Mohandessin', 'Dokki', 'Tagamoa', 'Rehab', 'Madinet Nasr',
-        'El Mokattam', 'Ain Shams', 'Shubra', 'Other'
-      ]
     },
     city: {
       type: String,
       default: 'Cairo'
     }
+  },
+  attributes: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
   },
   seller: {
     type: mongoose.Schema.Types.ObjectId,

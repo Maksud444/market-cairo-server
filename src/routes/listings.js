@@ -369,6 +369,8 @@ router.post('/', protect, verifiedOnly, upload.array('images', 10), compressImag
     }
 
     const { title, description, price, category, condition, location } = req.body;
+    const subcategory = req.body.subcategory || '';
+    const attributes = req.body.attributes ? JSON.parse(req.body.attributes) : {};
 
     // Process uploaded images (dataUrl for Vercel, file path for local)
     const images = req.files ? req.files.map(file => ({
@@ -381,9 +383,11 @@ router.post('/', protect, verifiedOnly, upload.array('images', 10), compressImag
       description,
       price: Number(price),
       category,
+      subcategory,
       condition,
       location: typeof location === 'string' ? JSON.parse(location) : location,
       images,
+      attributes,
       seller: req.user._id
     });
 
@@ -447,6 +451,7 @@ router.put('/:id', protect, upload.array('images', 10), compressImages, convertT
     if (condition) updateData.condition = condition;
     if (location) updateData.location = typeof location === 'string' ? JSON.parse(location) : location;
     if (status) updateData.status = status;
+    if (req.body.attributes) updateData.attributes = JSON.parse(req.body.attributes);
 
     // Add new images if uploaded (dataUrl for Vercel, file path for local)
     if (req.files && req.files.length > 0) {
