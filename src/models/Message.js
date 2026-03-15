@@ -49,7 +49,8 @@ const messageSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    required: true,
+    required: false,
+    default: '',
     maxlength: [1000, 'Message cannot exceed 1000 characters']
   },
   originalContent: {
@@ -62,8 +63,12 @@ const messageSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['text', 'image', 'system'],
+    enum: ['text', 'image', 'system', 'offer'],
     default: 'text'
+  },
+  offerAmount: {
+    type: Number,
+    default: null
   },
   attachments: [{
     url: String,

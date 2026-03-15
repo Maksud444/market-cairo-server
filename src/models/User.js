@@ -86,6 +86,11 @@ const userSchema = new mongoose.Schema({
     },
     rejectionReason: String
   },
+  blockedUsers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: []
+  }],
   lastSeen: {
     type: Date,
     default: Date.now

@@ -12,6 +12,8 @@ const { filterPersonalInfo } = require('../utils/contentFilter');
 // @access  Private
 router.get('/conversations', protect, async (req, res) => {
   try {
+    const currentUser = await User.findById(req.user._id).select('blockedUsers');
+
     const conversations = await Conversation.find({
       participants: req.user._id,
       isActive: true
@@ -24,12 +26,17 @@ router.get('/conversations', protect, async (req, res) => {
     const conversationsWithUnread = conversations.map(conv => {
       const convObj = conv.toObject();
       convObj.unreadCount = conv.unreadCount.get(req.user._id.toString()) || 0;
-      
+
       // Get the other participant
       convObj.otherParticipant = conv.participants.find(
         p => p._id.toString() !== req.user._id.toString()
       );
-      
+
+      // Check if this other participant is blocked by current user
+      convObj.isBlocked = currentUser.blockedUsers?.some(
+        id => id.toString() === convObj.otherParticipant?._id?.toString()
+      ) || false;
+
       return convObj;
     });
 
@@ -94,11 +101,17 @@ router.get('/conversations/:id', protect, async (req, res) => {
       p => p._id.toString() !== req.user._id.toString()
     );
 
+    const currentUser = await User.findById(req.user._id).select('blockedUsers');
+    const isBlocked = currentUser.blockedUsers?.some(
+      id => id.toString() === otherParticipant?._id?.toString()
+    ) || false;
+
     res.json({
       success: true,
       conversation: {
         ...conversation.toObject(),
-        otherParticipant
+        otherParticipant,
+        isBlocked
       },
       messages
     });
@@ -190,7 +203,7 @@ router.post('/conversations', protect, [
 // @desc    Send message
 // @access  Private
 router.post('/:conversationId', protect, [
-  body('content').trim().notEmpty().withMessage('Message content is required')
+  body('content').if(body('type').not().equals('offer')).trim().notEmpty().withMessage('Message content is required')
 ], async (req, res) => {
   try {
     const errors = validationResult(req);
@@ -218,19 +231,41 @@ router.post('/:conversationId', protect, [
       });
     }
 
-    const { content, type = 'text' } = req.body;
+    const { content, type = 'text', offerAmount } = req.body;
 
-    // Filter personal information
-    const filterResult = filterPersonalInfo(content);
+    // Check if sender has blocked the other user or vice versa
+    const otherUserId = conversation.participants.find(
+      p => p.toString() !== req.user._id.toString()
+    );
+    const senderUser = await User.findById(req.user._id).select('blockedUsers');
+    const otherUser = await User.findById(otherUserId).select('blockedUsers');
+    if (
+      senderUser.blockedUsers?.some(id => id.toString() === otherUserId.toString()) ||
+      otherUser.blockedUsers?.some(id => id.toString() === req.user._id.toString())
+    ) {
+      return res.status(403).json({ success: false, message: 'Cannot send message to this user' });
+    }
 
-    // Create message with filtered content
+    // Filter personal information (skip for offer messages)
+    let msgContent = content || '';
+    let isFiltered = false;
+    let originalContent;
+    if (type !== 'offer') {
+      const filterResult = filterPersonalInfo(msgContent);
+      msgContent = filterResult.filtered;
+      isFiltered = filterResult.hasFiltered;
+      if (isFiltered) originalContent = content;
+    }
+
+    // Create message
     const message = await Message.create({
       conversation: conversation._id,
       sender: req.user._id,
-      content: filterResult.filtered,
-      originalContent: filterResult.hasFiltered ? content : undefined,
-      isFiltered: filterResult.hasFiltered,
-      type
+      content: msgContent,
+      originalContent,
+      isFiltered,
+      type,
+      ...(type === 'offer' && offerAmount ? { offerAmount } : {})
     });
 
     // Log if filtered

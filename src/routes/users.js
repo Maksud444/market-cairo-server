@@ -290,4 +290,52 @@ router.put('/:id/status', protect, adminOnly, async (req, res) => {
   }
 });
 
+// @route   POST /api/users/block/:userId
+// @desc    Block a user
+// @access  Private
+router.post('/block/:userId', protect, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    if (userId === req.user._id.toString()) {
+      return res.status(400).json({ success: false, message: 'Cannot block yourself' });
+    }
+    await User.findByIdAndUpdate(req.user._id, {
+      $addToSet: { blockedUsers: userId }
+    });
+    res.json({ success: true, message: 'User blocked' });
+  } catch (error) {
+    console.error('Block user error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   DELETE /api/users/block/:userId
+// @desc    Unblock a user
+// @access  Private
+router.delete('/block/:userId', protect, async (req, res) => {
+  try {
+    const { userId } = req.params;
+    await User.findByIdAndUpdate(req.user._id, {
+      $pull: { blockedUsers: userId }
+    });
+    res.json({ success: true, message: 'User unblocked' });
+  } catch (error) {
+    console.error('Unblock user error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/users/blocked
+// @desc    Get list of blocked users
+// @access  Private
+router.get('/blocked', protect, async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id).populate('blockedUsers', '_id name');
+    res.json({ success: true, blockedUsers: user.blockedUsers || [] });
+  } catch (error) {
+    console.error('Get blocked users error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;
