@@ -345,7 +345,7 @@ router.get('/:id/similar', async (req, res) => {
 // @route   POST /api/listings
 // @desc    Create new listing
 // @access  Private
-router.post('/', protect, verifiedOnly, upload.array('images', 10), compressImages, convertToDataUrl, handleUploadErrors, [
+router.post('/', protect, upload.array('images', 10), compressImages, convertToDataUrl, handleUploadErrors, [
   body('title').trim().notEmpty().withMessage('Title is required'),
   body('description').trim().notEmpty().withMessage('Description is required'),
   body('price').isNumeric().withMessage('Valid price is required'),
