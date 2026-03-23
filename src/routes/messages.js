@@ -269,7 +269,7 @@ router.post('/:conversationId', protect, [
     });
 
     // Log if filtered
-    if (filterResult.hasFiltered) {
+    if (isFiltered) {
       console.log(`[FILTER] Message filtered from user ${req.user._id} in conversation ${conversation._id}`);
     }
 
@@ -325,6 +325,36 @@ router.post('/:conversationId', protect, [
       success: false,
       message: 'Server error'
     });
+  }
+});
+
+// @route   PATCH /api/messages/:messageId/offer
+// @desc    Accept or reject an offer (only the listing seller can do this)
+// @access  Private
+router.patch('/:messageId/offer', protect, async (req, res) => {
+  try {
+    const { status } = req.body; // 'accepted' or 'rejected'
+    if (!['accepted', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status' });
+    }
+
+    const message = await Message.findById(req.params.messageId).populate('sender', 'name');
+    if (!message || message.type !== 'offer') {
+      return res.status(404).json({ success: false, message: 'Offer not found' });
+    }
+
+    // Only the receiver (not sender) can accept/reject
+    if (message.sender._id.toString() === req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Cannot respond to your own offer' });
+    }
+
+    message.offerStatus = status;
+    await message.save();
+
+    res.json({ success: true, message });
+  } catch (error) {
+    console.error('Offer response error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

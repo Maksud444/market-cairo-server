@@ -70,6 +70,11 @@ const messageSchema = new mongoose.Schema({
     type: Number,
     default: null
   },
+  offerStatus: {
+    type: String,
+    enum: ['pending', 'accepted', 'rejected'],
+    default: 'pending'
+  },
   attachments: [{
     url: String,
     type: String,
