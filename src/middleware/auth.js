@@ -79,15 +79,16 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
-// Verified users only middleware
+// Verified users only middleware — disabled temporarily, passes through
 const verifiedOnly = (req, res, next) => {
-  if (req.user?.verification?.status !== 'approved') {
-    return res.status(403).json({
-      success: false,
-      message: 'Identity verification required',
-      requiresVerification: true
-    });
-  }
+  // TODO: re-enable verification check when verification system is ready
+  // if (req.user?.verification?.status !== 'approved') {
+  //   return res.status(403).json({
+  //     success: false,
+  //     message: 'Identity verification required',
+  //     requiresVerification: true
+  //   });
+  // }
   next();
 };
 
