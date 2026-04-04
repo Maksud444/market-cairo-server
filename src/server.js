@@ -16,6 +16,8 @@ const server = http.createServer(app);
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:3001',
+  'https://mysouqify.com',
+  'https://www.mysouqify.com',
   process.env.FRONTEND_URL,
   // Support comma-separated list of additional origins
   ...(process.env.EXTRA_ORIGINS ? process.env.EXTRA_ORIGINS.split(',').map(o => o.trim()) : [])
