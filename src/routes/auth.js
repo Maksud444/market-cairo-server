@@ -145,6 +145,7 @@ router.post('/login', loginValidation, async (req, res) => {
         rating: user.rating,
         salesCount: user.salesCount,
         isAdmin: user.isAdmin,
+        isSuperAdmin: user.isSuperAdmin || false,
         verification: user.verification ? {
           status: user.verification.status,
           rejectionReason: user.verification.rejectionReason
@@ -283,6 +284,7 @@ router.get('/me', protect, async (req, res) => {
         favorites: user.favorites,
         notifications: user.notifications.slice(0, 20),
         isAdmin: user.isAdmin,
+        isSuperAdmin: user.isSuperAdmin || false,
         verification: user.verification ? {
           status: user.verification.status,
           rejectionReason: user.verification.rejectionReason
