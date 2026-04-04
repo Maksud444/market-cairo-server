@@ -50,13 +50,16 @@ const connectDB = async () => {
     console.log('MongoDB connected successfully');
   } catch (error) {
     console.error('MongoDB connection error:', error.message);
-    if (!process.env.VERCEL) process.exit(1);
+    // Do not exit — let the server keep running and retry on next request
   }
 };
 
 // Ensure DB connection before every request (for serverless)
 app.use(async (req, res, next) => {
   await connectDB();
+  if (!isConnected && req.path.startsWith('/api/') && req.path !== '/api/health') {
+    return res.status(503).json({ success: false, message: 'Database not connected. Please try again.' });
+  }
   next();
 });
 
