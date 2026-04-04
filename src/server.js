@@ -97,35 +97,6 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/verification', verificationRoutes);
 
-// One-time seed endpoint — remove after use
-app.get('/api/run-seed-xk9q2', async (req, res) => {
-  try {
-    const bcrypt = require('bcryptjs');
-    const User = require('./models/User');
-    const adminEmail = process.env.ADMIN_EMAIL || 'adminmdbillah420@gmail.com';
-    const existing = await User.findOne({ email: adminEmail });
-    if (existing) {
-      return res.json({ success: true, message: 'Admin already exists', email: adminEmail });
-    }
-    const password = 'Admin@12345';
-    const hashed = await bcrypt.hash(password, 10);
-    await User.create({
-      name: 'Admin',
-      email: adminEmail,
-      password: hashed,
-      phone: '01000000000',
-      location: 'Cairo, Egypt',
-      isAdmin: true,
-      isActive: true,
-      rating: { average: 5.0, count: 0 },
-      salesCount: 0,
-    });
-    res.json({ success: true, message: 'Admin created', email: adminEmail, password });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
 // Root route
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'MySouqify API is running', docs: '/api/health' });
