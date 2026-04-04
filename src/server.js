@@ -97,21 +97,6 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/verification', verificationRoutes);
 
-// One-time fix admin password
-app.get('/api/fix-admin-xk9q2', async (req, res) => {
-  try {
-    const User = require('./models/User');
-    const adminEmail = process.env.ADMIN_EMAIL || 'adminmdbillah420@gmail.com';
-    const user = await User.findOne({ email: adminEmail });
-    if (!user) return res.json({ success: false, message: 'Admin not found' });
-    user.password = 'Admin@12345';
-    await user.save(); // triggers pre-save hash
-    res.json({ success: true, message: 'Admin password fixed', email: adminEmail, password: 'Admin@12345' });
-  } catch (e) {
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
 // Root route
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'MySouqify API is running', docs: '/api/health' });
