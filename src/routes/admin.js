@@ -686,6 +686,27 @@ router.delete('/categories/:id', async (req, res) => {
   }
 });
 
+// ── One-time setup: make a user super admin ────────────────────────────────
+// POST /api/admin/setup-super?secret=SETUP_SECRET  body: { email }
+router.post('/setup-super', async (req, res) => {
+  try {
+    const secret = process.env.SETUP_SECRET;
+    if (!secret || req.query.secret !== secret) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: 'email required' });
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    user.isAdmin = true;
+    user.isSuperAdmin = true;
+    await user.save();
+    res.json({ success: true, message: `${user.name} is now Super Admin` });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // ── Super Admin: Manage Admins ──────────────────────────────────────────────
 
 // GET /api/admin/admins — list all admins
