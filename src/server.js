@@ -42,6 +42,7 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Connect to MongoDB (cached for serverless)
 let isConnected = false;
+let lastDBError = null;
 
 // Reset flag on disconnect so next request retries
 mongoose.connection.on('disconnected', () => {
@@ -51,19 +52,21 @@ mongoose.connection.on('disconnected', () => {
 mongoose.connection.on('connected', () => {
   console.log('MongoDB connected successfully');
   isConnected = true;
+  lastDBError = null;
 });
 
 const connectDB = async () => {
   if (isConnected) return;
   try {
     await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/mysouqify', {
-      serverSelectionTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 30000,
     });
     isConnected = true;
+    lastDBError = null;
   } catch (error) {
     console.error('MongoDB connection error:', error.message);
     isConnected = false;
-    // Do not exit — let the server keep running and retry on next request
+    lastDBError = error.message;
   }
 };
 
@@ -101,7 +104,12 @@ app.get('/', (req, res) => {
 
 // Health check
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', message: 'MySouqify API is running' });
+  res.json({
+    status: 'ok',
+    message: 'MySouqify API is running',
+    db: isConnected ? 'connected' : 'disconnected',
+    dbError: lastDBError || null
+  });
 });
 
 // Socket.io connection handling
