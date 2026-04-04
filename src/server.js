@@ -97,6 +97,37 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/verification', verificationRoutes);
 
+// One-time seed listings
+app.get('/api/seed-listings-xk9q2', async (req, res) => {
+  try {
+    const Listing = require('./models/Listing');
+    const User = require('./models/User');
+    const admin = await User.findOne({ isAdmin: true });
+    if (!admin) return res.status(400).json({ success: false, message: 'No admin found' });
+    const count = await Listing.countDocuments();
+    if (count > 0) return res.json({ success: true, message: `Already has ${count} listings` });
+    const imgs = [
+      { url: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=600&h=400&fit=crop', publicId: '' },
+    ];
+    const listings = [
+      { title: 'MacBook Pro 2022 - M1 Pro', description: 'Apple MacBook Pro in perfect condition. M1 Pro chip, 16GB RAM, 512GB SSD. Includes charger.', price: 32000, category: 'Electronics', condition: 'Like New', location: { area: 'New Cairo', city: 'Cairo' }, featured: true },
+      { title: 'iPhone 14 Pro - 256GB', description: 'iPhone 14 Pro 256GB Space Black. Perfect condition, battery 100%. Original box included.', price: 24000, category: 'Mobile & Tablets', condition: 'Like New', location: { area: 'Maadi', city: 'Cairo' }, featured: true },
+      { title: 'Modern L-Shaped Sofa', description: 'Beautiful L-shaped sofa in excellent condition. 280x200cm. Smoke-free home.', price: 8500, category: 'Furniture', condition: 'Good', location: { area: 'Zamalek', city: 'Cairo' }, featured: true },
+      { title: 'Samsung Galaxy S23 Ultra', description: 'Samsung S23 Ultra 256GB Phantom Black. Excellent condition with original accessories.', price: 18000, category: 'Mobile & Tablets', condition: 'Like New', location: { area: 'Heliopolis', city: 'Cairo' }, featured: false },
+      { title: 'Gaming PC - RTX 4070', description: 'Custom gaming PC, RTX 4070, i7-13700K, 32GB DDR5 RAM, 1TB NVMe SSD.', price: 45000, category: 'Electronics', condition: 'Like New', location: { area: 'Sheikh Zayed', city: 'Cairo' }, featured: false },
+      { title: 'KitchenAid Stand Mixer', description: 'KitchenAid Artisan Stand Mixer in Empire Red. 5-quart, all attachments included.', price: 4500, category: 'Kitchen', condition: 'Like New', location: { area: 'Mohandessin', city: 'Cairo' }, featured: false },
+      { title: 'Dining Table Set - 6 Chairs', description: 'Solid wood dining table with 6 chairs. 180x90cm. Minor wear.', price: 6500, category: 'Furniture', condition: 'Good', location: { area: 'Giza', city: 'Cairo' }, featured: false },
+      { title: 'Classic Literature Book Collection', description: '25 classic books - Dostoevsky, Tolstoy, Austen. All in excellent condition.', price: 750, category: 'Books', condition: 'Good', location: { area: 'Downtown', city: 'Cairo' }, featured: false },
+    ];
+    for (const l of listings) {
+      await Listing.create({ ...l, seller: admin._id, images: imgs, moderationStatus: 'approved', status: 'active' });
+    }
+    res.json({ success: true, message: `Created ${listings.length} listings` });
+  } catch (e) {
+    res.status(500).json({ success: false, error: e.message });
+  }
+});
+
 // Root route
 app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'MySouqify API is running', docs: '/api/health' });
