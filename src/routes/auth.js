@@ -515,4 +515,29 @@ router.post('/reset-password/:token', [
   }
 });
 
+// @route   POST /api/auth/setup-super
+// @desc    Bootstrap: make a user super admin (works only if no super admin exists yet)
+// @access  Public (first-time only) / Secret-protected after that
+router.post('/setup-super', async (req, res) => {
+  try {
+    const existingSuperAdmin = await User.findOne({ isSuperAdmin: true });
+    if (existingSuperAdmin) {
+      const secret = process.env.SETUP_SECRET;
+      if (!secret || req.query.secret !== secret) {
+        return res.status(403).json({ success: false, message: 'Forbidden: super admin already exists' });
+      }
+    }
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ success: false, message: 'email required' });
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    user.isAdmin = true;
+    user.isSuperAdmin = true;
+    await user.save();
+    res.json({ success: true, message: `${user.name} is now Super Admin` });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 module.exports = router;
