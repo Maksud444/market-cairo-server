@@ -690,9 +690,13 @@ router.delete('/categories/:id', async (req, res) => {
 // POST /api/admin/setup-super?secret=SETUP_SECRET  body: { email }
 router.post('/setup-super', async (req, res) => {
   try {
-    const secret = process.env.SETUP_SECRET;
-    if (!secret || req.query.secret !== secret) {
-      return res.status(403).json({ success: false, message: 'Forbidden' });
+    // If a super admin already exists, require SETUP_SECRET to prevent abuse
+    const existingSuperAdmin = await User.findOne({ isSuperAdmin: true });
+    if (existingSuperAdmin) {
+      const secret = process.env.SETUP_SECRET;
+      if (!secret || req.query.secret !== secret) {
+        return res.status(403).json({ success: false, message: 'Forbidden: super admin already exists' });
+      }
     }
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, message: 'email required' });
