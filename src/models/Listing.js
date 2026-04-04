@@ -81,6 +81,8 @@ const listingSchema = new mongoose.Schema({
     default: 'pending' // Changed: New listings require admin approval
   },
   moderationNote: String,
+  moderatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  moderatedAt: Date,
   // Soft delete fields (2-day delay before permanent deletion)
   isDeleted: {
     type: Boolean,

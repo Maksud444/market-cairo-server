@@ -79,6 +79,14 @@ const adminOnly = (req, res, next) => {
   next();
 };
 
+// Super Admin only middleware
+const superAdminOnly = (req, res, next) => {
+  if (!req.user || !req.user.isSuperAdmin) {
+    return res.status(403).json({ success: false, message: 'Access denied. Super Admin only.' });
+  }
+  next();
+};
+
 // Verified users only middleware — disabled temporarily, passes through
 const verifiedOnly = (req, res, next) => {
   // TODO: re-enable verification check when verification system is ready
@@ -92,4 +100,4 @@ const verifiedOnly = (req, res, next) => {
   next();
 };
 
-module.exports = { protect, optionalAuth, adminOnly, verifiedOnly };
+module.exports = { protect, optionalAuth, adminOnly, verifiedOnly, superAdminOnly };

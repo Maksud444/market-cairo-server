@@ -60,6 +60,10 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  isSuperAdmin: { type: Boolean, default: false },
+  adminCreatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  passwordResetToken: String,
+  passwordResetExpires: Date,
   isActive: {
     type: Boolean,
     default: true

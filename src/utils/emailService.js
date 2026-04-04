@@ -109,4 +109,27 @@ const sendListingRejected = async (email, name, listingTitle, reason) => {
   }
 };
 
-module.exports = { sendVerificationApproved, sendVerificationRejected, sendListingApproved, sendListingRejected };
+const sendPasswordReset = async (email, name, resetUrl) => {
+  try {
+    await transporter.sendMail({
+      from: `"MySouqify" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      to: email,
+      subject: 'Password Reset Request',
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;">
+          <h2 style="color:#E00000;">Password Reset</h2>
+          <p>Hello ${name},</p>
+          <p>You requested a password reset. Click the button below to reset your password. This link expires in 1 hour.</p>
+          <a href="${resetUrl}" style="display:inline-block;padding:12px 24px;background:#E00000;color:#fff;text-decoration:none;border-radius:8px;margin-top:16px;">Reset Password</a>
+          <p style="margin-top:20px;color:#666;">If you didn't request this, please ignore this email.</p>
+          <p style="color:#999;font-size:12px;">Link: ${resetUrl}</p>
+        </div>
+      `
+    });
+    console.log('[EMAIL] Password reset email sent to:', email);
+  } catch (error) {
+    console.error('[EMAIL] Failed to send password reset email:', error.message);
+  }
+};
+
+module.exports = { sendVerificationApproved, sendVerificationRejected, sendListingApproved, sendListingRejected, sendPasswordReset };

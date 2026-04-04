@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect, adminOnly } = require('../middleware/auth');
+const { protect, adminOnly, superAdminOnly } = require('../middleware/auth');
 const User = require('../models/User');
 const Listing = require('../models/Listing');
 const Category = require('../models/Category');
@@ -349,6 +349,8 @@ router.put('/listings/:id/moderate', async (req, res) => {
 
     listing.moderationStatus = action === 'approve' ? 'approved' : 'rejected';
     listing.moderationNote = note || '';
+    listing.moderatedBy = req.user?._id;
+    listing.moderatedAt = new Date();
 
     // If rejected, set status to removed
     if (action === 'reject') {
@@ -680,6 +682,105 @@ router.delete('/categories/:id', async (req, res) => {
     }
     res.json({ success: true, message: 'Category deleted' });
   } catch (error) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// ── Super Admin: Manage Admins ──────────────────────────────────────────────
+
+// GET /api/admin/admins — list all admins
+router.get('/admins', protect, adminOnly, superAdminOnly, async (req, res) => {
+  try {
+    const admins = await User.find({ isAdmin: true })
+      .select('name email isAdmin isSuperAdmin isActive adminCreatedBy createdAt lastSeen')
+      .populate('adminCreatedBy', 'name email');
+    res.json({ success: true, admins });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// POST /api/admin/admins — create new admin
+router.post('/admins', protect, adminOnly, superAdminOnly, [
+  require('express-validator').body('name').trim().notEmpty(),
+  require('express-validator').body('email').isEmail().normalizeEmail(),
+  require('express-validator').body('password').isLength({ min: 6 }),
+], async (req, res) => {
+  try {
+    const { validationResult } = require('express-validator');
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) return res.status(400).json({ success: false, errors: errors.array() });
+    const { name, email, password } = req.body;
+    const exists = await User.findOne({ email });
+    if (exists) {
+      if (exists.isAdmin) return res.status(400).json({ success: false, message: 'User is already an admin' });
+      exists.isAdmin = true;
+      exists.adminCreatedBy = req.user._id;
+      await exists.save();
+      return res.json({ success: true, message: 'Existing user promoted to admin', admin: exists });
+    }
+    const admin = await User.create({
+      name, email, password,
+      isAdmin: true,
+      isSuperAdmin: false,
+      adminCreatedBy: req.user._id,
+      isActive: true,
+      rating: { average: 0, count: 0 },
+      salesCount: 0,
+    });
+    res.status(201).json({ success: true, message: 'Admin created', admin });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// DELETE /api/admin/admins/:id — remove admin role
+router.delete('/admins/:id', protect, adminOnly, superAdminOnly, async (req, res) => {
+  try {
+    const admin = await User.findById(req.params.id);
+    if (!admin) return res.status(404).json({ success: false, message: 'User not found' });
+    if (admin.isSuperAdmin) return res.status(403).json({ success: false, message: 'Cannot remove super admin role' });
+    if (admin._id.toString() === req.user._id.toString()) return res.status(400).json({ success: false, message: 'Cannot remove your own admin role' });
+    admin.isAdmin = false;
+    admin.adminCreatedBy = undefined;
+    await admin.save();
+    res.json({ success: true, message: 'Admin role removed' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PUT /api/admin/admins/:id/reset-password — reset admin password
+router.put('/admins/:id/reset-password', protect, adminOnly, superAdminOnly, [
+  require('express-validator').body('newPassword').isLength({ min: 6 }),
+], async (req, res) => {
+  try {
+    const admin = await User.findById(req.params.id);
+    if (!admin || !admin.isAdmin) return res.status(404).json({ success: false, message: 'Admin not found' });
+    admin.password = req.body.newPassword;
+    await admin.save();
+    res.json({ success: true, message: 'Admin password reset successfully' });
+  } catch (e) {
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/admin/activity — admin moderation activity log
+router.get('/activity', protect, adminOnly, superAdminOnly, async (req, res) => {
+  try {
+    const { adminId, page = 1, limit = 20 } = req.query;
+    const query = { moderatedBy: { $exists: true, $ne: null } };
+    if (adminId) query.moderatedBy = adminId;
+    const listings = await Listing.find(query)
+      .select('title moderationStatus moderationNote moderatedBy moderatedAt seller')
+      .populate('moderatedBy', 'name email')
+      .populate('seller', 'name email')
+      .sort({ moderatedAt: -1 })
+      .skip((page - 1) * limit)
+      .limit(parseInt(limit));
+    const total = await Listing.countDocuments(query);
+    res.json({ success: true, listings, total, pages: Math.ceil(total / limit) });
+  } catch (e) {
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
