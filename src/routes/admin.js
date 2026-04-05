@@ -14,43 +14,48 @@ router.use(adminOnly);
 // @access  Admin
 router.get('/dashboard/stats', async (req, res) => {
   try {
-    // Get user statistics
-    const totalUsers = await User.countDocuments();
-    const activeUsers = await User.countDocuments({ isActive: true });
-    const adminUsers = await User.countDocuments({ isAdmin: true });
-    const newUsersThisMonth = await User.countDocuments({
-      createdAt: { $gte: new Date(new Date().setDate(1)) }
-    });
+    const monthStart = new Date(new Date().setDate(1));
 
-    // Get listing statistics
-    const totalListings = await Listing.countDocuments();
-    const activeListings = await Listing.countDocuments({ status: 'active' });
-    const soldListings = await Listing.countDocuments({ status: 'sold' });
-    const pendingListings = await Listing.countDocuments({
-      moderationStatus: 'pending'
-    });
-    const reportedListings = await Listing.countDocuments({
-      'reports.0': { $exists: true }
-    });
-
-    // Get category breakdown
-    const categoryCounts = await Listing.aggregate([
-      { $group: { _id: '$category', count: { $sum: 1 } } },
-      { $sort: { count: -1 } }
+    // All 11 queries in parallel — was sequential before (9 round-trips → 1)
+    const [
+      totalUsers,
+      activeUsers,
+      adminUsers,
+      newUsersThisMonth,
+      totalListings,
+      activeListings,
+      soldListings,
+      pendingListings,
+      reportedListings,
+      categoryCounts,
+      recentUsers,
+      recentListings,
+    ] = await Promise.all([
+      User.countDocuments(),
+      User.countDocuments({ isActive: true }),
+      User.countDocuments({ isAdmin: true }),
+      User.countDocuments({ createdAt: { $gte: monthStart } }),
+      Listing.countDocuments(),
+      Listing.countDocuments({ status: 'active' }),
+      Listing.countDocuments({ status: 'sold' }),
+      Listing.countDocuments({ moderationStatus: 'pending' }),
+      Listing.countDocuments({ 'reports.0': { $exists: true } }),
+      Listing.aggregate([
+        { $group: { _id: '$category', count: { $sum: 1 } } },
+        { $sort: { count: -1 } },
+      ]),
+      User.find()
+        .select('name email createdAt isAdmin isActive')
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
+      Listing.find()
+        .populate('seller', 'name email')
+        .select('title price category status createdAt')
+        .sort({ createdAt: -1 })
+        .limit(10)
+        .lean(),
     ]);
-
-    // Get recent users (last 10)
-    const recentUsers = await User.find()
-      .select('name email createdAt isAdmin isActive')
-      .sort({ createdAt: -1 })
-      .limit(10);
-
-    // Get recent listings (last 10)
-    const recentListings = await Listing.find()
-      .populate('seller', 'name email')
-      .select('title price category status createdAt')
-      .sort({ createdAt: -1 })
-      .limit(10);
 
     res.json({
       success: true,

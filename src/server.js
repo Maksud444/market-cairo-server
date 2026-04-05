@@ -5,6 +5,9 @@ const dotenv = require('dotenv');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const helmet = require('helmet');
+const compression = require('compression');
+const { apiLimiter } = require('./middleware/rateLimiter');
 
 // Load environment variables
 dotenv.config();
@@ -31,14 +34,25 @@ const io = new Server(server, {
   }
 });
 
+// Security headers
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow images to load cross-origin
+}));
+
+// Gzip compression (reduces response size ~70%)
+app.use(compression());
+
 // Middleware
 app.use(cors({
   origin: allowedOrigins,
   credentials: true
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
+
+// Global rate limiter — 200 requests per 15 min per IP
+app.use('/api/', apiLimiter);
 
 // Connect to MongoDB (cached for serverless)
 let isConnected = false;

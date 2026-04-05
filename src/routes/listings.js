@@ -5,6 +5,8 @@ const Listing = require('../models/Listing');
 const User = require('../models/User');
 const { protect, optionalAuth, verifiedOnly } = require('../middleware/auth');
 const { upload, handleUploadErrors, compressImages, convertToDataUrl } = require('../middleware/upload');
+const cache = require('../middleware/cache');
+const { searchLimiter } = require('../middleware/rateLimiter');
 
 // @route   GET /api/listings
 // @desc    Get all listings with filters, search, and pagination
@@ -54,14 +56,9 @@ router.get('/', optionalAuth, async (req, res) => {
       andConditions.push({ price: priceFilter });
     }
 
-    // Text search using regex (works without text index)
+    // Text search — use MongoDB text index (fast), fall back to regex only if needed
     if (search) {
-      andConditions.push({
-        $or: [
-          { title: { $regex: search, $options: 'i' } },
-          { description: { $regex: search, $options: 'i' } }
-        ]
-      });
+      andConditions.push({ $text: { $search: search } });
     }
 
     const queryObj = { $and: andConditions };
@@ -69,36 +66,28 @@ router.get('/', optionalAuth, async (req, res) => {
     // Sort options
     let sortOption = {};
     switch (sort) {
-      case 'price_low':
-        sortOption = { price: 1 };
-        break;
-      case 'price_high':
-        sortOption = { price: -1 };
-        break;
-      case 'popular':
-        sortOption = { views: -1 };
-        break;
-      case 'oldest':
-        sortOption = { createdAt: 1 };
-        break;
-      case 'newest':
-      case 'recent':
-      default:
-        sortOption = { createdAt: -1 };
+      case 'price_low':  sortOption = { price: 1 };       break;
+      case 'price_high': sortOption = { price: -1 };      break;
+      case 'popular':    sortOption = { views: -1 };      break;
+      case 'oldest':     sortOption = { createdAt: 1 };   break;
+      default:           sortOption = { createdAt: -1 };
     }
+    // When using text search, also sort by relevance score
+    if (search) sortOption = { score: { $meta: 'textScore' }, ...sortOption };
 
     // Pagination
     const skip = (Number(page) - 1) * Number(limit);
 
-    // Execute query
-    const listings = await Listing.find(queryObj)
-      .populate('seller', 'name avatar rating phone')
-      .sort(sortOption)
-      .skip(skip)
-      .limit(Number(limit));
-
-    // Get total count
-    const total = await Listing.countDocuments(queryObj);
+    // Run find + countDocuments in parallel (saves one round-trip)
+    const [listings, total] = await Promise.all([
+      Listing.find(queryObj)
+        .populate('seller', 'name avatar rating phone')
+        .sort(sortOption)
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      Listing.countDocuments(queryObj),
+    ]);
 
     res.json({
       success: true,
@@ -120,9 +109,9 @@ router.get('/', optionalAuth, async (req, res) => {
 });
 
 // @route   GET /api/listings/featured
-// @desc    Get featured listings
+// @desc    Get featured listings (cached 3 min)
 // @access  Public
-router.get('/featured', async (req, res) => {
+router.get('/featured', cache.cacheMiddleware(180), async (req, res) => {
   try {
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
     const listings = await Listing.find({
@@ -135,25 +124,20 @@ router.get('/featured', async (req, res) => {
     })
       .populate('seller', 'name avatar rating phone')
       .sort({ createdAt: -1 })
-      .limit(8);
+      .limit(8)
+      .lean();
 
-    res.json({
-      success: true,
-      listings
-    });
+    res.json({ success: true, listings });
   } catch (error) {
     console.error('Get featured error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 // @route   GET /api/listings/recent
-// @desc    Get recent listings
+// @desc    Get recent listings (cached 2 min)
 // @access  Public
-router.get('/recent', async (req, res) => {
+router.get('/recent', cache.cacheMiddleware(120), async (req, res) => {
   try {
     const { limit = 8 } = req.query;
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
@@ -167,34 +151,30 @@ router.get('/recent', async (req, res) => {
     })
       .populate('seller', 'name avatar rating phone')
       .sort({ createdAt: -1 })
-      .limit(Number(limit));
+      .limit(Number(limit))
+      .lean();
 
-    res.json({
-      success: true,
-      listings
-    });
+    res.json({ success: true, listings });
   } catch (error) {
     console.error('Get recent error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
 // @route   GET /api/listings/stats
-// @desc    Get marketplace statistics
+// @desc    Get marketplace statistics (cached 10 min)
 // @access  Public
-router.get('/stats', async (req, res) => {
+router.get('/stats', cache.cacheMiddleware(600), async (req, res) => {
   try {
-    const activeListings = await Listing.countDocuments({ status: 'active' });
-    const totalMembers = await User.countDocuments({ isActive: true });
-    const soldListings = await Listing.countDocuments({ status: 'sold' });
-
-    // Category counts
-    const categoryCounts = await Listing.aggregate([
-      { $match: { status: 'active' } },
-      { $group: { _id: '$category', count: { $sum: 1 } } }
+    // All 4 queries in parallel
+    const [activeListings, totalMembers, soldListings, categoryCounts] = await Promise.all([
+      Listing.countDocuments({ status: 'active' }),
+      User.countDocuments({ isActive: true }),
+      Listing.countDocuments({ status: 'sold' }),
+      Listing.aggregate([
+        { $match: { status: 'active' } },
+        { $group: { _id: '$category', count: { $sum: 1 } } }
+      ]),
     ]);
 
     res.json({
@@ -212,10 +192,7 @@ router.get('/stats', async (req, res) => {
     });
   } catch (error) {
     console.error('Get stats error:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Server error'
-    });
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 

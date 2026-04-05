@@ -3,6 +3,7 @@ const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
+const { authLimiter } = require('../middleware/rateLimiter');
 
 // Validation rules
 const registerValidation = [
@@ -19,7 +20,7 @@ const loginValidation = [
 // @route   POST /api/auth/register
 // @desc    Register new user
 // @access  Public
-router.post('/register', registerValidation, async (req, res) => {
+router.post('/register', authLimiter, registerValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -79,7 +80,7 @@ router.post('/register', registerValidation, async (req, res) => {
 // @route   POST /api/auth/login
 // @desc    Login user
 // @access  Public
-router.post('/login', loginValidation, async (req, res) => {
+router.post('/login', authLimiter, loginValidation, async (req, res) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -447,7 +448,7 @@ router.put('/notifications/:id/read', protect, async (req, res) => {
 // @route   POST /api/auth/forgot-password
 // @desc    Request password reset email
 // @access  Public
-router.post('/forgot-password', [
+router.post('/forgot-password', authLimiter, [
   body('email').isEmail().normalizeEmail().withMessage('Valid email is required')
 ], async (req, res) => {
   try {

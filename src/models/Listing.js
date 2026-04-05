@@ -120,6 +120,9 @@ listingSchema.index({ createdAt: -1 });
 listingSchema.index({ views: -1 });
 listingSchema.index({ seller: 1 });
 listingSchema.index({ featured: -1, createdAt: -1 });
+// Soft-delete + moderation compound indexes (critical for homepage & search queries)
+listingSchema.index({ isDeleted: 1, deletedAt: 1 });
+listingSchema.index({ moderationStatus: 1, status: 1, isDeleted: 1, createdAt: -1 });
 
 // Virtual for formatted price
 listingSchema.virtual('formattedPrice').get(function() {
