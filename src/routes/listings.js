@@ -487,6 +487,8 @@ router.put('/:id', protect, upload.array('images', 10), compressImages, convertT
     if (location) updateData.location = typeof location === 'string' ? JSON.parse(location) : location;
     if (status) updateData.status = status;
     if (req.body.attributes) updateData.attributes = JSON.parse(req.body.attributes);
+    if (req.body.whatsappPhone !== undefined) updateData.whatsappPhone = req.body.whatsappPhone;
+    if (req.body.donationNote !== undefined) updateData.donationNote = req.body.donationNote;
 
     // Add new images if uploaded (dataUrl for Vercel, file path for local)
     if (req.files && req.files.length > 0) {
