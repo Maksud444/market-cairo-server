@@ -393,6 +393,7 @@ router.post('/', protect, upload.array('images', 10), compressImages, convertToD
     const isDonation = req.body.isDonation === 'true' || req.body.isDonation === true;
     const pickupAvailable = req.body.pickupAvailable !== 'false';
     const donationNote = req.body.donationNote || '';
+    const whatsappPhone = req.body.whatsappPhone || '';
 
     // Validate price only for non-donations
     if (!isDonation && (!price || Number(price) < 1)) {
@@ -421,7 +422,8 @@ router.post('/', protect, upload.array('images', 10), compressImages, convertToD
       seller: req.user._id,
       isDonation,
       pickupAvailable,
-      donationNote
+      donationNote,
+      whatsappPhone
     });
 
     await listing.populate('seller', 'name avatar rating phone');

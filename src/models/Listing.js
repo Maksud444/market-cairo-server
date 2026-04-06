@@ -30,6 +30,10 @@ const listingSchema = new mongoose.Schema({
     maxlength: [300, 'Donation note cannot exceed 300 characters'],
     default: ''
   },
+  whatsappPhone: {
+    type: String,
+    default: ''
+  },
   category: {
     type: String,
     required: [true, 'Please select a category'],
