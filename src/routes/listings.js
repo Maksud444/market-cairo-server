@@ -25,7 +25,8 @@ router.get('/', optionalAuth, async (req, res) => {
       page = 1,
       limit = 20,
       featured,
-      seller
+      seller,
+      isDonation
     } = req.query;
 
     // Build query - include soft-deleted items within 2 days
@@ -47,6 +48,8 @@ router.get('/', optionalAuth, async (req, res) => {
     if (location) andConditions.push({ 'location.area': location });
     if (seller) andConditions.push({ seller });
     if (featured === 'true') andConditions.push({ featured: true });
+    if (isDonation === 'true') andConditions.push({ isDonation: true });
+    else if (isDonation === 'false') andConditions.push({ isDonation: { $ne: true } });
 
     // Price filter
     if (minPrice || maxPrice) {
@@ -105,6 +108,34 @@ router.get('/', optionalAuth, async (req, res) => {
       success: false,
       message: 'Server error'
     });
+  }
+});
+
+// @route   GET /api/listings/donations
+// @desc    Get recent donation listings (cached 2 min)
+// @access  Public
+router.get('/donations', cache.cacheMiddleware(120), async (req, res) => {
+  try {
+    const { limit = 8 } = req.query;
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+
+    const listings = await Listing.find({
+      isDonation: true,
+      moderationStatus: 'approved',
+      $or: [
+        { status: 'active', isDeleted: { $ne: true } },
+        { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
+      ]
+    })
+      .populate('seller', 'name avatar rating phone')
+      .sort({ createdAt: -1 })
+      .limit(Number(limit))
+      .lean();
+
+    res.json({ success: true, listings });
+  } catch (error) {
+    console.error('Get donations error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
   }
 });
 
@@ -348,6 +379,17 @@ router.post('/', protect, upload.array('images', 10), compressImages, convertToD
     const { title, description, price, category, condition, location } = req.body;
     const subcategory = req.body.subcategory || '';
     const attributes = req.body.attributes ? JSON.parse(req.body.attributes) : {};
+    const isDonation = req.body.isDonation === 'true' || req.body.isDonation === true;
+    const pickupAvailable = req.body.pickupAvailable !== 'false';
+    const donationNote = req.body.donationNote || '';
+
+    // Validate price only for non-donations
+    if (!isDonation && (!price || Number(price) < 1)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Price must be at least 1 EGP for non-donation listings'
+      });
+    }
 
     // Process uploaded images (dataUrl for Vercel, file path for local)
     const images = req.files ? req.files.map(file => ({
@@ -358,14 +400,17 @@ router.post('/', protect, upload.array('images', 10), compressImages, convertToD
     const listing = await Listing.create({
       title,
       description,
-      price: Number(price),
-      category,
+      price: isDonation ? 0 : Number(price),
+      category: isDonation ? 'Donate' : category,
       subcategory,
       condition,
       location: typeof location === 'string' ? JSON.parse(location) : location,
       images,
       attributes,
-      seller: req.user._id
+      seller: req.user._id,
+      isDonation,
+      pickupAvailable,
+      donationNote
     });
 
     await listing.populate('seller', 'name avatar rating phone');

@@ -14,8 +14,21 @@ const listingSchema = new mongoose.Schema({
   },
   price: {
     type: Number,
-    required: [true, 'Please provide a price'],
-    min: [1, 'Price must be at least 1 EGP']
+    default: 0,
+    min: [0, 'Price cannot be negative']
+  },
+  isDonation: {
+    type: Boolean,
+    default: false
+  },
+  pickupAvailable: {
+    type: Boolean,
+    default: true
+  },
+  donationNote: {
+    type: String,
+    maxlength: [300, 'Donation note cannot exceed 300 characters'],
+    default: ''
   },
   category: {
     type: String,
@@ -123,6 +136,7 @@ listingSchema.index({ featured: -1, createdAt: -1 });
 // Soft-delete + moderation compound indexes (critical for homepage & search queries)
 listingSchema.index({ isDeleted: 1, deletedAt: 1 });
 listingSchema.index({ moderationStatus: 1, status: 1, isDeleted: 1, createdAt: -1 });
+listingSchema.index({ isDonation: 1, moderationStatus: 1, isDeleted: 1, createdAt: -1 });
 
 // Virtual for formatted price
 listingSchema.virtual('formattedPrice').get(function() {
