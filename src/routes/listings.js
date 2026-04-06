@@ -42,14 +42,22 @@ router.get('/', optionalAuth, async (req, res) => {
       }
     ];
 
+    // Always separate donations from regular listings unless explicitly requested
+    if (isDonation === 'true') {
+      andConditions.push({ isDonation: true });
+    } else if (isDonation === 'false') {
+      andConditions.push({ isDonation: { $ne: true } });
+    } else {
+      // Default: exclude donations from normal listing queries
+      andConditions.push({ isDonation: { $ne: true } });
+    }
+
     if (category) andConditions.push({ category });
     if (subcategory) andConditions.push({ subcategory });
     if (condition) andConditions.push({ condition });
     if (location) andConditions.push({ 'location.area': location });
     if (seller) andConditions.push({ seller });
     if (featured === 'true') andConditions.push({ featured: true });
-    if (isDonation === 'true') andConditions.push({ isDonation: true });
-    else if (isDonation === 'false') andConditions.push({ isDonation: { $ne: true } });
 
     // Price filter
     if (minPrice || maxPrice) {
@@ -148,6 +156,7 @@ router.get('/featured', cache.cacheMiddleware(180), async (req, res) => {
     const listings = await Listing.find({
       moderationStatus: 'approved',
       featured: true,
+      isDonation: { $ne: true },
       $or: [
         { status: 'active', isDeleted: { $ne: true } },
         { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
@@ -175,6 +184,7 @@ router.get('/recent', cache.cacheMiddleware(120), async (req, res) => {
 
     const listings = await Listing.find({
       moderationStatus: 'approved',
+      isDonation: { $ne: true },
       $or: [
         { status: 'active', isDeleted: { $ne: true } },
         { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
@@ -328,6 +338,7 @@ router.get('/:id/similar', async (req, res) => {
       _id: { $ne: listing._id },
       category: listing.category,
       moderationStatus: 'approved',
+      isDonation: { $ne: true },
       $or: [
         { status: 'active', isDeleted: { $ne: true } },
         { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }

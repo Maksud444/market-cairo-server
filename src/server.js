@@ -54,34 +54,46 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Global rate limiter — 200 requests per 15 min per IP
 app.use('/api/', apiLimiter);
 
-// Connect to MongoDB (cached for serverless)
+// Connect to MongoDB (cached for serverless — race-safe with a pending promise)
 let isConnected = false;
 let lastDBError = null;
+let connectingPromise = null;
 
-// Reset flag on disconnect so next request retries
 mongoose.connection.on('disconnected', () => {
   console.log('MongoDB disconnected — will retry on next request');
   isConnected = false;
+  connectingPromise = null;
 });
 mongoose.connection.on('connected', () => {
   console.log('MongoDB connected successfully');
   isConnected = true;
   lastDBError = null;
+  connectingPromise = null;
+});
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB connection error event:', err.message);
+  isConnected = false;
+  connectingPromise = null;
 });
 
 const connectDB = async () => {
   if (isConnected) return;
-  try {
-    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/mysouqify', {
-      serverSelectionTimeoutMS: 30000,
-    });
+  // Reuse in-flight connect promise to avoid duplicate mongoose.connect() calls
+  if (connectingPromise) return connectingPromise;
+  connectingPromise = mongoose.connect(
+    process.env.MONGODB_URI || 'mongodb://localhost:27017/mysouqify',
+    { serverSelectionTimeoutMS: 30000 }
+  ).then(() => {
     isConnected = true;
     lastDBError = null;
-  } catch (error) {
+    connectingPromise = null;
+  }).catch((error) => {
     console.error('MongoDB connection error:', error.message);
     isConnected = false;
     lastDBError = error.message;
-  }
+    connectingPromise = null;
+  });
+  return connectingPromise;
 };
 
 // Ensure DB connection before every request (for serverless)
@@ -141,27 +153,33 @@ io.on('connection', (socket) => {
     io.emit('userOnline', { userId });
   });
 
-  socket.on('sendMessage', async (data) => {
-    const { senderId, receiverId, content, listingId } = data;
-    
-    // Emit to receiver if online
-    const receiverSocketId = connectedUsers.get(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit('newMessage', {
-        senderId,
-        receiverId,
-        content,
-        listingId,
-        createdAt: new Date()
-      });
+  socket.on('sendMessage', (data) => {
+    try {
+      const { senderId, receiverId, content, listingId } = data;
+      const receiverSocketId = connectedUsers.get(receiverId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit('newMessage', {
+          senderId,
+          receiverId,
+          content,
+          listingId,
+          createdAt: new Date()
+        });
+      }
+    } catch (err) {
+      console.error('[SOCKET] sendMessage error:', err.message);
     }
   });
 
   socket.on('typing', (data) => {
-    const { receiverId } = data;
-    const receiverSocketId = connectedUsers.get(receiverId);
-    if (receiverSocketId) {
-      io.to(receiverSocketId).emit('userTyping', { senderId: socket.userId });
+    try {
+      const { receiverId } = data;
+      const receiverSocketId = connectedUsers.get(receiverId);
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit('userTyping', { senderId: socket.userId });
+      }
+    } catch (err) {
+      console.error('[SOCKET] typing error:', err.message);
     }
   });
 
@@ -182,6 +200,34 @@ io.on('connection', (socket) => {
 
 // Make io accessible to routes
 app.set('io', io);
+
+// ── 404 handler ──────────────────────────────────────────────────────────────
+app.use((req, res) => {
+  res.status(404).json({ success: false, message: 'Route not found' });
+});
+
+// ── Global Express error handler (must have 4 params) ────────────────────────
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, next) => {
+  console.error('[EXPRESS ERROR]', err.stack || err.message);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    success: false,
+    message: err.message || 'Internal server error'
+  });
+});
+
+// ── Process-level crash guards ────────────────────────────────────────────────
+process.on('unhandledRejection', (reason) => {
+  console.error('[UNHANDLED REJECTION]', reason);
+  // Don't crash — log and continue
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[UNCAUGHT EXCEPTION]', err.stack || err.message);
+  // Give the server a moment to log, then exit so the process manager restarts it
+  process.exit(1);
+});
 
 // Only start server in local dev (not on Vercel)
 if (!process.env.VERCEL) {

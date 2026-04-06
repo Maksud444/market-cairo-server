@@ -34,9 +34,13 @@ const protect = async (req, res, next) => {
       });
     }
 
-    // Update last seen
-    req.user.lastSeen = new Date();
-    await req.user.save();
+    // Update lastSeen at most once per 5 minutes (fire-and-forget, no await)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    if (!req.user.lastSeen || req.user.lastSeen < fiveMinutesAgo) {
+      User.findByIdAndUpdate(req.user._id, { lastSeen: new Date() }, { timestamps: false })
+        .exec()
+        .catch(() => {});
+    }
 
     next();
   } catch (error) {
