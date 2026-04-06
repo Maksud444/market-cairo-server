@@ -639,11 +639,14 @@ router.post('/categories/seed', async (req, res) => {
 });
 
 // @route   GET /api/admin/categories
-// @desc    Get all categories (including inactive)
+// @desc    Get all categories (including inactive); ?type=donation|regular to filter
 // @access  Admin
 router.get('/categories', async (req, res) => {
   try {
-    const categories = await Category.find().sort({ order: 1, name: 1 });
+    const filter = {};
+    if (req.query.type === 'donation') filter.isDonation = true;
+    else if (req.query.type === 'regular') filter.isDonation = { $ne: true };
+    const categories = await Category.find(filter).sort({ order: 1, name: 1 });
     res.json({ success: true, categories });
   } catch (error) {
     res.status(500).json({ success: false, message: 'Server error' });
@@ -655,7 +658,7 @@ router.get('/categories', async (req, res) => {
 // @access  Admin
 router.post('/categories', async (req, res) => {
   try {
-    const { name, icon, slug, subcategories, order } = req.body;
+    const { name, icon, slug, subcategories, order, isDonation } = req.body;
     if (!name || !slug) {
       return res.status(400).json({ success: false, message: 'Name and slug are required' });
     }
@@ -663,7 +666,12 @@ router.post('/categories', async (req, res) => {
     if (existing) {
       return res.status(400).json({ success: false, message: 'Category name or slug already exists' });
     }
-    const category = await Category.create({ name, icon: icon || 'box', slug, subcategories: subcategories || [], order: order || 0 });
+    const category = await Category.create({
+      name, icon: icon || 'box', slug,
+      subcategories: subcategories || [],
+      order: order || 0,
+      isDonation: !!isDonation
+    });
     res.status(201).json({ success: true, category });
   } catch (error) {
     console.error('Create category error:', error);
@@ -676,10 +684,12 @@ router.post('/categories', async (req, res) => {
 // @access  Admin
 router.put('/categories/:id', async (req, res) => {
   try {
-    const { name, icon, slug, subcategories, order, isActive } = req.body;
+    const { name, icon, slug, subcategories, order, isActive, isDonation } = req.body;
+    const updateFields = { name, icon, slug, subcategories, order, isActive };
+    if (isDonation !== undefined) updateFields.isDonation = !!isDonation;
     const category = await Category.findByIdAndUpdate(
       req.params.id,
-      { name, icon, slug, subcategories, order, isActive },
+      updateFields,
       { new: true, runValidators: true }
     );
     if (!category) {

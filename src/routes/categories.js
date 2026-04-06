@@ -93,8 +93,12 @@ const locations = [
 // Conditions
 const conditions = ['New', 'Like New', 'Good', 'Fair'];
 
-async function getCategories() {
-  const dbCats = await Category.find({ isActive: true }).sort({ order: 1, name: 1 });
+async function getCategories(isDonation = false) {
+  const filter = { isActive: true };
+  if (isDonation) filter.isDonation = true;
+  else filter.isDonation = { $ne: true };
+  const dbCats = await Category.find(filter).sort({ order: 1, name: 1 });
+  if (isDonation) return dbCats; // no default fallback for donation cats
   return dbCats.length > 0 ? dbCats : defaultCategories;
 }
 
@@ -128,6 +132,19 @@ router.get('/', async (req, res) => {
     res.json({ success: true, categories: categoriesWithCounts });
   } catch (error) {
     console.error('Get categories error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   GET /api/categories/donation
+// @desc    Get active donation categories
+// @access  Public
+router.get('/donation', async (req, res) => {
+  try {
+    const cats = await getCategories(true);
+    res.json({ success: true, categories: cats });
+  } catch (error) {
+    console.error('Get donation categories error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

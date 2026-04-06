@@ -34,6 +34,10 @@ const categorySchema = new mongoose.Schema({
   isActive: {
     type: Boolean,
     default: true
+  },
+  isDonation: {
+    type: Boolean,
+    default: false
   }
 }, { timestamps: true });
 
