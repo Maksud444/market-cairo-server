@@ -51,6 +51,14 @@ const listingSchema = new mongoose.Schema({
     type: [String],
     default: []
   },
+  rentSubCategory: {
+    type: String,
+    default: ''
+  },
+  rentModel: {
+    type: String,
+    default: ''
+  },
   pickupAvailable: {
     type: Boolean,
     default: true

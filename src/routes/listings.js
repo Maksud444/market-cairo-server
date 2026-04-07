@@ -153,7 +153,7 @@ router.get('/donations', cache.cacheMiddleware(120), async (req, res) => {
 // @access  Public
 router.get('/rent', async (req, res) => {
   try {
-    const { limit = 8, rentCategory } = req.query;
+    const { limit = 8, rentCategory, rentSubCategory } = req.query;
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
 
     const query = {
@@ -167,6 +167,9 @@ router.get('/rent', async (req, res) => {
 
     if (rentCategory && rentCategory !== 'all') {
       query.rentCategory = rentCategory;
+    }
+    if (rentSubCategory && rentSubCategory !== 'all') {
+      query.rentSubCategory = rentSubCategory;
     }
 
     const listings = await Listing.find(query)
@@ -438,6 +441,8 @@ router.post('/', protect, upload.array('images', 10), compressImages, convertToD
     const storeName = req.body.storeName || '';
     const rentSizes = req.body.rentSizes ? JSON.parse(req.body.rentSizes) : [];
     const rentColors = req.body.rentColors ? JSON.parse(req.body.rentColors) : [];
+    const rentSubCategory = req.body.rentSubCategory || '';
+    const rentModel = req.body.rentModel || '';
 
     // Validate price only for non-donations and non-rent
     if (!isDonation && !isRent && (!price || Number(price) < 1)) {
@@ -482,7 +487,9 @@ router.post('/', protect, upload.array('images', 10), compressImages, convertToD
       pricePerDayMax,
       storeName,
       rentSizes,
-      rentColors
+      rentColors,
+      rentSubCategory,
+      rentModel
     });
 
     await listing.populate('seller', 'name avatar rating phone');
