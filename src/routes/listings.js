@@ -494,6 +494,18 @@ router.post('/', protect, upload.array('images', 10), compressImages, convertToD
 
     await listing.populate('seller', 'name avatar rating phone');
 
+    // Notify all admins by email (fire-and-forget)
+    try {
+      const { sendAdminNewListing } = require('../utils/emailService');
+      const admins = await User.find({ isAdmin: true, isActive: true }).select('email').lean();
+      if (admins.length > 0) {
+        const adminEmails = admins.map(a => a.email);
+        await sendAdminNewListing(adminEmails, listing, listing.seller.name, false);
+      }
+    } catch (emailErr) {
+      console.error('[EMAIL] Admin notification failed (non-fatal):', emailErr.message);
+    }
+
     res.status(201).json({
       success: true,
       listing
@@ -542,6 +554,7 @@ router.put('/:id', protect, upload.array('images', 10), compressImages, convertT
       });
     }
 
+    const wasRejected = listing.moderationStatus === 'rejected';
     const { title, description, price, category, condition, location, status } = req.body;
 
     const updateData = {};
@@ -565,11 +578,31 @@ router.put('/:id', protect, upload.array('images', 10), compressImages, convertT
       updateData.images = [...(listing.images || []), ...newImages];
     }
 
+    // If user is resubmitting a rejected listing, reset moderation to pending
+    if (wasRejected && !req.user.isAdmin) {
+      updateData.moderationStatus = 'pending';
+      updateData.moderationNote = '';
+      updateData.status = 'active';
+    }
+
     listing = await Listing.findByIdAndUpdate(
       req.params.id,
       updateData,
       { new: true, runValidators: true }
     ).populate('seller', 'name avatar rating phone');
+
+    // If repost: notify admins by email
+    if (wasRejected && !req.user.isAdmin) {
+      try {
+        const { sendAdminNewListing } = require('../utils/emailService');
+        const admins = await User.find({ isAdmin: true, isActive: true }).select('email').lean();
+        if (admins.length > 0) {
+          await sendAdminNewListing(admins.map(a => a.email), listing, listing.seller.name, true);
+        }
+      } catch (emailErr) {
+        console.error('[EMAIL] Admin repost notification failed (non-fatal):', emailErr.message);
+      }
+    }
 
     res.json({
       success: true,

@@ -109,6 +109,52 @@ const sendListingRejected = async (email, name, listingTitle, reason) => {
   }
 };
 
+const sendAdminNewListing = async (adminEmails, listing, sellerName, isRepost = false) => {
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const adminPanelUrl = `${frontendUrl}/cp-x4m9k2/listings?moderation=pending`;
+  const subject = isRepost
+    ? `🔄 Repost for Review: "${listing.title}"`
+    : `📋 New Listing Pending Approval: "${listing.title}"`;
+
+  const badgeColor = isRepost ? '#f59e0b' : '#3b82f6';
+  const badgeText = isRepost ? 'REPOST' : 'NEW';
+  const headingText = isRepost
+    ? `A listing has been resubmitted for review`
+    : `A new listing is waiting for your approval`;
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px;background:#f9fafb;">
+      <div style="background:#fff;border-radius:12px;padding:28px;border:1px solid #e5e7eb;">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+          <span style="background:${badgeColor};color:#fff;font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;letter-spacing:0.5px;">${badgeText}</span>
+          <h2 style="margin:0;color:#111827;font-size:18px;">${headingText}</h2>
+        </div>
+        <table style="width:100%;border-collapse:collapse;margin-bottom:20px;">
+          <tr><td style="padding:8px 0;color:#6b7280;font-size:13px;width:120px;">Title</td><td style="padding:8px 0;font-weight:600;color:#111827;">${listing.title}</td></tr>
+          <tr style="background:#f9fafb;"><td style="padding:8px;color:#6b7280;font-size:13px;">Seller</td><td style="padding:8px;color:#111827;">${sellerName}</td></tr>
+          <tr><td style="padding:8px 0;color:#6b7280;font-size:13px;">Category</td><td style="padding:8px 0;color:#111827;">${listing.category}</td></tr>
+          <tr style="background:#f9fafb;"><td style="padding:8px;color:#6b7280;font-size:13px;">Type</td><td style="padding:8px;color:#111827;">${listing.isRent ? 'Rent' : listing.isDonation ? 'Donation' : 'Sale'}</td></tr>
+          <tr><td style="padding:8px 0;color:#6b7280;font-size:13px;">Price</td><td style="padding:8px 0;color:#111827;">${listing.isDonation ? 'FREE' : listing.isRent ? `${listing.pricePerDay} EGP/day` : `${listing.price} EGP`}</td></tr>
+        </table>
+        <a href="${adminPanelUrl}" style="display:inline-block;padding:13px 28px;background:#E00000;color:#fff;text-decoration:none;border-radius:8px;font-weight:700;font-size:14px;">Review in Admin Panel →</a>
+        <p style="margin-top:20px;color:#9ca3af;font-size:12px;">You are receiving this because you are an admin on MySouqify.</p>
+      </div>
+    </div>
+  `;
+
+  try {
+    await transporter.sendMail({
+      from: `"MySouqify Admin" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      to: Array.isArray(adminEmails) ? adminEmails.join(',') : adminEmails,
+      subject,
+      html
+    });
+    console.log('[EMAIL] Admin new listing notification sent');
+  } catch (error) {
+    console.error('[EMAIL] Failed to send admin new listing email:', error.message);
+  }
+};
+
 const sendPasswordReset = async (email, name, resetUrl) => {
   try {
     await transporter.sendMail({
@@ -132,4 +178,4 @@ const sendPasswordReset = async (email, name, resetUrl) => {
   }
 };
 
-module.exports = { sendVerificationApproved, sendVerificationRejected, sendListingApproved, sendListingRejected, sendPasswordReset };
+module.exports = { sendVerificationApproved, sendVerificationRejected, sendListingApproved, sendListingRejected, sendPasswordReset, sendAdminNewListing };
