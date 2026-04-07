@@ -29,6 +29,8 @@ router.get('/dashboard/stats', async (req, res) => {
       reportedListings,
       pendingDonations,
       totalDonations,
+      pendingRent,
+      totalRent,
       categoryCounts,
       recentUsers,
       recentListings,
@@ -44,6 +46,8 @@ router.get('/dashboard/stats', async (req, res) => {
       Listing.countDocuments({ 'reports.0': { $exists: true } }),
       Listing.countDocuments({ isDonation: true, moderationStatus: 'pending' }),
       Listing.countDocuments({ isDonation: true }),
+      Listing.countDocuments({ isRent: true, moderationStatus: 'pending' }),
+      Listing.countDocuments({ isRent: true }),
       Listing.aggregate([
         { $group: { _id: '$category', count: { $sum: 1 } } },
         { $sort: { count: -1 } },
@@ -80,6 +84,10 @@ router.get('/dashboard/stats', async (req, res) => {
         donations: {
           total: totalDonations,
           pendingApproval: pendingDonations
+        },
+        rent: {
+          total: totalRent,
+          pendingApproval: pendingRent
         },
         categories: categoryCounts,
         recentUsers,
@@ -258,7 +266,8 @@ router.get('/listings', async (req, res) => {
       category = 'all',
       status = 'all',
       moderation = 'all',
-      isDonation  // 'true' | 'false' | undefined (all)
+      isDonation,  // 'true' | 'false' | undefined (all)
+      isRent       // 'true' | 'false' | undefined (all)
     } = req.query;
 
     const query = {};
@@ -288,6 +297,13 @@ router.get('/listings', async (req, res) => {
       query.isDonation = true;
     } else if (isDonation === 'false') {
       query.isDonation = { $ne: true };
+    }
+
+    // Filter by rent type
+    if (isRent === 'true') {
+      query.isRent = true;
+    } else if (isRent === 'false') {
+      query.isRent = { $ne: true };
     }
 
     const listings = await Listing.find(query)

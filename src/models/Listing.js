@@ -21,6 +21,36 @@ const listingSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  // Rent fields
+  isRent: {
+    type: Boolean,
+    default: false
+  },
+  rentCategory: {
+    type: String,
+    enum: ['camera', 'wedding', 'azhar', ''],
+    default: ''
+  },
+  pricePerDay: {
+    type: Number,
+    default: 0
+  },
+  pricePerDayMax: {
+    type: Number,
+    default: 0
+  },
+  storeName: {
+    type: String,
+    default: ''
+  },
+  rentSizes: {
+    type: [String],
+    default: []
+  },
+  rentColors: {
+    type: [String],
+    default: []
+  },
   pickupAvailable: {
     type: Boolean,
     default: true
@@ -141,6 +171,7 @@ listingSchema.index({ featured: -1, createdAt: -1 });
 listingSchema.index({ isDeleted: 1, deletedAt: 1 });
 listingSchema.index({ moderationStatus: 1, status: 1, isDeleted: 1, createdAt: -1 });
 listingSchema.index({ isDonation: 1, moderationStatus: 1, isDeleted: 1, createdAt: -1 });
+listingSchema.index({ isRent: 1, rentCategory: 1, moderationStatus: 1, isDeleted: 1, createdAt: -1 });
 
 // Virtual for formatted price
 listingSchema.virtual('formattedPrice').get(function() {

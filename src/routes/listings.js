@@ -42,14 +42,15 @@ router.get('/', optionalAuth, async (req, res) => {
       }
     ];
 
-    // Always separate donations from regular listings unless explicitly requested
+    // Always separate donations and rent from regular listings unless explicitly requested
     if (isDonation === 'true') {
       andConditions.push({ isDonation: true });
     } else if (isDonation === 'false') {
       andConditions.push({ isDonation: { $ne: true } });
     } else {
-      // Default: exclude donations from normal listing queries
+      // Default: exclude donations and rent from normal listing queries
       andConditions.push({ isDonation: { $ne: true } });
+      andConditions.push({ isRent: { $ne: true } });
     }
 
     if (category) andConditions.push({ category });
@@ -147,6 +148,40 @@ router.get('/donations', cache.cacheMiddleware(120), async (req, res) => {
   }
 });
 
+// @route   GET /api/listings/rent
+// @desc    Get rent listings with optional category filter
+// @access  Public
+router.get('/rent', async (req, res) => {
+  try {
+    const { limit = 8, rentCategory } = req.query;
+    const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+
+    const query = {
+      isRent: true,
+      moderationStatus: 'approved',
+      $or: [
+        { status: 'active', isDeleted: { $ne: true } },
+        { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
+      ]
+    };
+
+    if (rentCategory && rentCategory !== 'all') {
+      query.rentCategory = rentCategory;
+    }
+
+    const listings = await Listing.find(query)
+      .populate('seller', 'name avatar rating phone')
+      .sort({ createdAt: -1 })
+      .limit(Number(limit))
+      .lean();
+
+    res.json({ success: true, listings });
+  } catch (error) {
+    console.error('Get rent listings error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // @route   GET /api/listings/featured
 // @desc    Get featured listings (cached 3 min)
 // @access  Public
@@ -157,6 +192,7 @@ router.get('/featured', cache.cacheMiddleware(180), async (req, res) => {
       moderationStatus: 'approved',
       featured: true,
       isDonation: { $ne: true },
+      isRent: { $ne: true },
       $or: [
         { status: 'active', isDeleted: { $ne: true } },
         { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
@@ -185,6 +221,7 @@ router.get('/recent', cache.cacheMiddleware(120), async (req, res) => {
     const listings = await Listing.find({
       moderationStatus: 'approved',
       isDonation: { $ne: true },
+      isRent: { $ne: true },
       $or: [
         { status: 'active', isDeleted: { $ne: true } },
         { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
@@ -391,15 +428,30 @@ router.post('/', protect, upload.array('images', 10), compressImages, convertToD
     const subcategory = req.body.subcategory || '';
     const attributes = req.body.attributes ? JSON.parse(req.body.attributes) : {};
     const isDonation = req.body.isDonation === 'true' || req.body.isDonation === true;
+    const isRent = req.body.isRent === 'true' || req.body.isRent === true;
     const pickupAvailable = req.body.pickupAvailable !== 'false';
     const donationNote = req.body.donationNote || '';
     const whatsappPhone = req.body.whatsappPhone || '';
+    const rentCategory = req.body.rentCategory || '';
+    const pricePerDay = req.body.pricePerDay ? Number(req.body.pricePerDay) : 0;
+    const pricePerDayMax = req.body.pricePerDayMax ? Number(req.body.pricePerDayMax) : 0;
+    const storeName = req.body.storeName || '';
+    const rentSizes = req.body.rentSizes ? JSON.parse(req.body.rentSizes) : [];
+    const rentColors = req.body.rentColors ? JSON.parse(req.body.rentColors) : [];
 
-    // Validate price only for non-donations
-    if (!isDonation && (!price || Number(price) < 1)) {
+    // Validate price only for non-donations and non-rent
+    if (!isDonation && !isRent && (!price || Number(price) < 1)) {
       return res.status(400).json({
         success: false,
         message: 'Price must be at least 1 EGP for non-donation listings'
+      });
+    }
+
+    // Validate rent-specific fields
+    if (isRent && pricePerDay < 1) {
+      return res.status(400).json({
+        success: false,
+        message: 'Price per day must be at least 1 EGP for rent listings'
       });
     }
 
@@ -412,8 +464,8 @@ router.post('/', protect, upload.array('images', 10), compressImages, convertToD
     const listing = await Listing.create({
       title,
       description,
-      price: isDonation ? 0 : Number(price),
-      category: isDonation ? 'Donate' : category,
+      price: isDonation ? 0 : isRent ? pricePerDay : Number(price),
+      category: isDonation ? 'Donate' : isRent ? 'Rent' : category,
       subcategory,
       condition,
       location: typeof location === 'string' ? JSON.parse(location) : location,
@@ -421,9 +473,16 @@ router.post('/', protect, upload.array('images', 10), compressImages, convertToD
       attributes,
       seller: req.user._id,
       isDonation,
+      isRent,
       pickupAvailable,
       donationNote,
-      whatsappPhone
+      whatsappPhone,
+      rentCategory,
+      pricePerDay,
+      pricePerDayMax,
+      storeName,
+      rentSizes,
+      rentColors
     });
 
     await listing.populate('seller', 'name avatar rating phone');
