@@ -8,38 +8,38 @@ const handler = (req, res) => {
   });
 };
 
-// Auth endpoints (login, register, forgot-password) — strict
-// 10 attempts per 15 minutes per IP
+// Auth endpoints (login, register, forgot-password)
+// 50 attempts per 15 minutes per IP
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 10,
+  max: 50,
   standardHeaders: true,
   legacyHeaders: false,
   handler,
 });
 
-// General API limiter — 200 req / 15 min per IP
+// General API limiter — 1000 req / 15 min per IP
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 200,
+  max: 1000,
   standardHeaders: true,
   legacyHeaders: false,
   handler,
 });
 
-// Search/browse endpoints — 100 req / minute per IP
+// Search/browse endpoints — 300 req / minute per IP
 const searchLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 100,
+  max: 300,
   standardHeaders: true,
   legacyHeaders: false,
   handler,
 });
 
-// File upload endpoints — 20 req / 10 minutes per IP
+// File upload endpoints — 30 req / 10 minutes per IP
 const uploadLimiter = rateLimit({
   windowMs: 10 * 60 * 1000,
-  max: 20,
+  max: 30,
   standardHeaders: true,
   legacyHeaders: false,
   handler,
