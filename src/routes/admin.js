@@ -209,6 +209,24 @@ router.put('/users/:id/role', async (req, res) => {
   }
 });
 
+// @route   GET /api/admin/users/:id
+// @desc    Get single user detail (admin)
+// @access  Admin
+router.get('/users/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id).select('-password');
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+    const listingsCount = await Listing.countDocuments({ seller: user._id });
+    const activeListings = await Listing.find({ seller: user._id, status: 'active' })
+      .select('title price images createdAt status moderationStatus')
+      .sort({ createdAt: -1 })
+      .limit(10);
+    res.json({ success: true, user, listingsCount, activeListings });
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Failed to fetch user' });
+  }
+});
+
 // @route   PUT /api/admin/users/:id/status
 // @desc    Toggle user active status
 // @access  Admin
