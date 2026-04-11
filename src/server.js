@@ -69,11 +69,15 @@ const connectDB = async () => {
   connectingPromise = mongoose.connect(
     process.env.MONGODB_URI || 'mongodb://localhost:27017/mysouqify',
     {
-      serverSelectionTimeoutMS: 10000, // fail fast — 10s not 30s
+      serverSelectionTimeoutMS: 10000,
       socketTimeoutMS: 45000,
       maxPoolSize: 10,
-      minPoolSize: 1,
+      minPoolSize: 2,
       retryWrites: true,
+      // Keep connections alive — prevents Atlas from dropping idle connections
+      heartbeatFrequencyMS: 10000,
+      keepAlive: true,
+      keepAliveInitialDelay: 300000,
     }
   ).then(() => {
     lastDBError = null;
@@ -90,8 +94,10 @@ const connectDB = async () => {
 };
 
 mongoose.connection.on('disconnected', () => {
-  console.log('MongoDB disconnected — will reconnect on next request');
+  console.log('MongoDB disconnected — attempting reconnect...');
   connectingPromise = null;
+  // Auto-reconnect after 3 seconds
+  setTimeout(() => connectDB(), 3000);
 });
 mongoose.connection.on('error', (err) => {
   console.error('MongoDB error:', err.message);
