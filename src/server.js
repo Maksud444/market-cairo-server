@@ -54,53 +54,64 @@ app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 // Global rate limiter — 200 requests per 15 min per IP
 app.use('/api/', apiLimiter);
 
-// Connect to MongoDB (cached for serverless — race-safe with a pending promise)
-let isConnected = false;
-let lastDBError = null;
+// MongoDB connection — optimized for serverless (Vercel)
+// Uses mongoose.connection.readyState to check real connection state
+// instead of a custom boolean that can get out of sync
 let connectingPromise = null;
-
-mongoose.connection.on('disconnected', () => {
-  console.log('MongoDB disconnected — will retry on next request');
-  isConnected = false;
-  connectingPromise = null;
-});
-mongoose.connection.on('connected', () => {
-  console.log('MongoDB connected successfully');
-  isConnected = true;
-  lastDBError = null;
-  connectingPromise = null;
-});
-mongoose.connection.on('error', (err) => {
-  console.error('MongoDB connection error event:', err.message);
-  isConnected = false;
-  connectingPromise = null;
-});
+let lastDBError = null;
 
 const connectDB = async () => {
-  if (isConnected) return;
-  // Reuse in-flight connect promise to avoid duplicate mongoose.connect() calls
-  if (connectingPromise) return connectingPromise;
+  // 1 = connected, 2 = connecting
+  const state = mongoose.connection.readyState;
+  if (state === 1) return; // already connected
+  if (state === 2 && connectingPromise) return connectingPromise; // already connecting
+
   connectingPromise = mongoose.connect(
     process.env.MONGODB_URI || 'mongodb://localhost:27017/mysouqify',
-    { serverSelectionTimeoutMS: 30000 }
+    {
+      serverSelectionTimeoutMS: 10000, // fail fast — 10s not 30s
+      socketTimeoutMS: 45000,
+      maxPoolSize: 10,
+      minPoolSize: 1,
+      retryWrites: true,
+    }
   ).then(() => {
-    isConnected = true;
     lastDBError = null;
     connectingPromise = null;
+    console.log('MongoDB connected');
   }).catch((error) => {
-    console.error('MongoDB connection error:', error.message);
-    isConnected = false;
     lastDBError = error.message;
     connectingPromise = null;
+    console.error('MongoDB connection error:', error.message);
+    // Don't throw — let the request middleware handle it
   });
+
   return connectingPromise;
 };
 
-// Ensure DB connection before every request (for serverless)
+mongoose.connection.on('disconnected', () => {
+  console.log('MongoDB disconnected — will reconnect on next request');
+  connectingPromise = null;
+});
+mongoose.connection.on('error', (err) => {
+  console.error('MongoDB error:', err.message);
+  connectingPromise = null;
+});
+
+// Ensure DB connection before every API request
 app.use(async (req, res, next) => {
-  await connectDB();
-  if (!isConnected && req.path.startsWith('/api/') && req.path !== '/api/health') {
-    return res.status(503).json({ success: false, message: 'Database not connected. Please try again.' });
+  if (req.path === '/api/health' || req.path === '/') return next();
+  try {
+    await connectDB();
+  } catch (e) {
+    // connectDB never throws but just in case
+  }
+  if (mongoose.connection.readyState !== 1 && req.path.startsWith('/api/')) {
+    return res.status(503).json({
+      success: false,
+      message: 'Service temporarily unavailable. Please try again in a moment.',
+      retryAfter: 3,
+    });
   }
   next();
 });
@@ -135,7 +146,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'ok',
     message: 'MySouqify API is running',
-    db: isConnected ? 'connected' : 'disconnected',
+    db: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     dbError: lastDBError || null
   });
 });
