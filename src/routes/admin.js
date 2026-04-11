@@ -284,6 +284,7 @@ router.get('/listings', async (req, res) => {
       category = 'all',
       status = 'all',
       moderation = 'all',
+      moderationStatus,
       isDonation,  // 'true' | 'false' | undefined (all)
       isRent       // 'true' | 'false' | undefined (all)
     } = req.query;
@@ -305,9 +306,10 @@ router.get('/listings', async (req, res) => {
       query.status = status;
     }
 
-    // Filter by moderation status
-    if (moderation !== 'all') {
-      query.moderationStatus = moderation;
+    // Filter by moderation status (accept both param names)
+    const moderationValue = moderationStatus || moderation;
+    if (moderationValue && moderationValue !== 'all') {
+      query.moderationStatus = moderationValue;
     }
 
     // Filter by donation type
