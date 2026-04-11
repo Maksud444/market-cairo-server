@@ -4,6 +4,7 @@ const { body, validationResult } = require('express-validator');
 const User = require('../models/User');
 const { protect } = require('../middleware/auth');
 const { authLimiter } = require('../middleware/rateLimiter');
+const { addContact } = require('../services/brevo');
 
 // Validation rules
 const registerValidation = [
@@ -51,6 +52,9 @@ router.post('/register', authLimiter, registerValidation, async (req, res) => {
 
     // Generate token
     const token = user.generateToken();
+
+    // Sync to Brevo (non-blocking)
+    addContact({ email: user.email, firstName: user.name.split(' ')[0] });
 
     res.status(201).json({
       success: true,
@@ -186,6 +190,8 @@ router.post('/google', async (req, res) => {
         name,
         avatar
       });
+      // Sync new Google user to Brevo (non-blocking)
+      addContact({ email: user.email, firstName: user.name.split(' ')[0] });
     }
 
     const token = user.generateToken();

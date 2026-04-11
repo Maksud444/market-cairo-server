@@ -113,6 +113,7 @@ const messageRoutes = require('./routes/messages');
 const categoryRoutes = require('./routes/categories');
 const adminRoutes = require('./routes/admin');
 const verificationRoutes = require('./routes/verification');
+const newsletterRoutes = require('./routes/newsletter');
 
 // Use routes
 app.use('/api/auth', authRoutes);
@@ -122,6 +123,7 @@ app.use('/api/messages', messageRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/verification', verificationRoutes);
+app.use('/api/newsletter', newsletterRoutes);
 
 // Root route
 app.get('/', (req, res) => {
