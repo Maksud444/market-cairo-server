@@ -34,6 +34,9 @@ const io = new Server(server, {
   }
 });
 
+// Trust reverse proxy (Coolify/nginx) — needed for rate limiter + real IP detection
+app.set('trust proxy', 1);
+
 // Security headers
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow images to load cross-origin
