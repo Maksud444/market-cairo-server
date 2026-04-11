@@ -74,10 +74,7 @@ const connectDB = async () => {
       maxPoolSize: 10,
       minPoolSize: 2,
       retryWrites: true,
-      // Keep connections alive — prevents Atlas from dropping idle connections
       heartbeatFrequencyMS: 10000,
-      keepAlive: true,
-      keepAliveInitialDelay: 300000,
     }
   ).then(() => {
     lastDBError = null;
