@@ -16,7 +16,7 @@ router.get('/conversations', protect, async (req, res) => {
 
     const conversations = await Conversation.find({
       participants: req.user._id,
-      isActive: true
+      isActive: { $ne: false }
     })
       .populate('participants', 'name avatar lastSeen')
       .populate('listing', 'title images price status')
@@ -179,7 +179,8 @@ router.post('/conversations', protect, [
     conversation = await Conversation.create({
       participants: [req.user._id, sellerId],
       listing: listingId,
-      unreadCount: new Map()
+      unreadCount: new Map(),
+      isActive: true
     });
 
     await conversation.populate('participants', 'name avatar lastSeen');
