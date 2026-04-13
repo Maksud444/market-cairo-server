@@ -159,7 +159,7 @@ router.post('/conversations', protect, [
       });
     }
 
-    // Check for existing conversation
+    // Check for existing conversation (including deleted ones to reactivate)
     let conversation = await Conversation.findOne({
       participants: { $all: [req.user._id, sellerId] },
       listing: listingId
@@ -168,6 +168,11 @@ router.post('/conversations', protect, [
       .populate('listing', 'title images price status');
 
     if (conversation) {
+      // Reactivate if previously deleted
+      if (!conversation.isActive) {
+        conversation.isActive = true;
+        await conversation.save();
+      }
       return res.json({
         success: true,
         conversation,
