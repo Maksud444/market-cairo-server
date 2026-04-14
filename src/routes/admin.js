@@ -651,7 +651,10 @@ router.post('/categories/seed', async (req, res) => {
       { name: 'Electronics', icon: 'monitor', slug: 'electronics', order: 1,
         subcategories: [
           { name: 'TV, Audio & Video', subcategories: [] }, { name: 'Computers & Laptops', subcategories: [] },
-          { name: 'Video Games', subcategories: [] }, { name: 'Cameras', subcategories: [] }
+          { name: 'Video Games', subcategories: [] }, { name: 'Cameras', subcategories: [] },
+          { name: 'Washing Machine', subcategories: [] }, { name: 'Fridge', subcategories: [] },
+          { name: 'Air Condition', subcategories: [] }, { name: 'Air Cooler', subcategories: [] },
+          { name: 'Blender', subcategories: [] }, { name: 'Air Fryer', subcategories: [] }
         ]
       },
       { name: 'Fashion & Beauty', icon: 'shirt', slug: 'fashion-beauty', order: 2,
@@ -670,6 +673,32 @@ router.post('/categories/seed', async (req, res) => {
     res.json({ success: true, message: 'Categories seeded', count: defaults.length });
   } catch (error) {
     console.error('Seed categories error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// @route   POST /api/admin/categories/migrate-electronics
+// @desc    Add missing subcategories to Electronics (idempotent)
+// @access  Admin
+router.post('/categories/migrate-electronics', async (req, res) => {
+  try {
+    const electronics = await Category.findOne({ name: 'Electronics' });
+    if (!electronics) {
+      return res.status(404).json({ success: false, message: 'Electronics category not found' });
+    }
+    const existing = (electronics.subcategories || []).map(s => s.name);
+    const toAdd = [
+      'Washing Machine', 'Fridge', 'Air Condition', 'Air Cooler', 'Blender', 'Air Fryer'
+    ].filter(name => !existing.includes(name));
+
+    if (toAdd.length === 0) {
+      return res.json({ success: true, message: 'All subcategories already present', existing });
+    }
+    toAdd.forEach(name => electronics.subcategories.push({ name, subcategories: [] }));
+    await electronics.save();
+    res.json({ success: true, message: `Added: ${toAdd.join(', ')}`, total: electronics.subcategories.length });
+  } catch (error) {
+    console.error('Migrate electronics error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
