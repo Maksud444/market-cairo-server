@@ -160,6 +160,14 @@ const listingSchema = new mongoose.Schema({
       'Other'
     ],
     default: null
+  },
+  isDonated: {
+    type: Boolean,
+    default: false
+  },
+  donatedAt: {
+    type: Date,
+    default: null
   }
 }, {
   timestamps: true

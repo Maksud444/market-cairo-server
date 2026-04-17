@@ -617,6 +617,30 @@ router.put('/:id', protect, upload.array('images', 10), compressImages, convertT
   }
 });
 
+// @route   PATCH /api/listings/:id/mark-donated
+// @desc    Mark a donation listing as donated (keeps it visible with "Donated" badge)
+// @access  Private (owner only)
+router.patch('/:id/mark-donated', protect, async (req, res) => {
+  try {
+    const listing = await Listing.findById(req.params.id);
+    if (!listing) return res.status(404).json({ success: false, message: 'Listing not found' });
+    if (listing.seller.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Not authorized' });
+    }
+    if (!listing.isDonation) {
+      return res.status(400).json({ success: false, message: 'Only donation listings can be marked as donated' });
+    }
+    listing.isDonated = true;
+    listing.donatedAt = new Date();
+    listing.status = 'sold';
+    await listing.save();
+    res.json({ success: true, listing });
+  } catch (error) {
+    console.error('Mark donated error:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // @route   DELETE /api/listings/:id
 // @desc    Soft delete listing (shows as sold for 2 days)
 // @access  Private (owner only)
