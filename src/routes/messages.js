@@ -18,7 +18,7 @@ router.get('/conversations', protect, async (req, res) => {
       participants: req.user._id,
       isActive: { $ne: false }
     })
-      .populate('participants', 'name avatar lastSeen')
+      .populate('participants', 'name avatar lastSeen verification.status')
       .populate('listing', 'title images price status')
       .sort({ updatedAt: -1 });
 
@@ -59,7 +59,7 @@ router.get('/conversations', protect, async (req, res) => {
 router.get('/conversations/:id', protect, async (req, res) => {
   try {
     const conversation = await Conversation.findById(req.params.id)
-      .populate('participants', 'name avatar lastSeen')
+      .populate('participants', 'name avatar lastSeen verification.status')
       .populate('listing', 'title images price status seller');
 
     if (!conversation) {
@@ -164,7 +164,7 @@ router.post('/conversations', protect, [
       participants: { $all: [req.user._id, sellerId] },
       listing: listingId
     })
-      .populate('participants', 'name avatar lastSeen')
+      .populate('participants', 'name avatar lastSeen verification.status')
       .populate('listing', 'title images price status');
 
     if (conversation) {
@@ -188,7 +188,7 @@ router.post('/conversations', protect, [
       isActive: true
     });
 
-    await conversation.populate('participants', 'name avatar lastSeen');
+    await conversation.populate('participants', 'name avatar lastSeen verification.status');
     await conversation.populate('listing', 'title images price status');
 
     res.status(201).json({

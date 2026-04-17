@@ -93,7 +93,7 @@ router.get('/', optionalAuth, async (req, res) => {
     // Run find + countDocuments in parallel (saves one round-trip)
     const [listings, total] = await Promise.all([
       Listing.find(queryObj)
-        .populate('seller', 'name avatar rating phone')
+        .populate('seller', 'name avatar rating phone verification.status')
         .sort(sortOption)
         .skip(skip)
         .limit(Number(limit))
@@ -136,7 +136,7 @@ router.get('/donations', cache.cacheMiddleware(120), async (req, res) => {
         { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
       ]
     })
-      .populate('seller', 'name avatar rating phone')
+      .populate('seller', 'name avatar rating phone verification.status')
       .sort({ createdAt: -1 })
       .limit(Number(limit))
       .lean();
@@ -173,7 +173,7 @@ router.get('/rent', async (req, res) => {
     }
 
     const listings = await Listing.find(query)
-      .populate('seller', 'name avatar rating phone')
+      .populate('seller', 'name avatar rating phone verification.status')
       .sort({ createdAt: -1 })
       .limit(Number(limit))
       .lean();
@@ -201,7 +201,7 @@ router.get('/featured', cache.cacheMiddleware(180), async (req, res) => {
         { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
       ]
     })
-      .populate('seller', 'name avatar rating phone')
+      .populate('seller', 'name avatar rating phone verification.status')
       .sort({ createdAt: -1 })
       .limit(8)
       .lean();
@@ -230,7 +230,7 @@ router.get('/recent', cache.cacheMiddleware(120), async (req, res) => {
         { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
       ]
     })
-      .populate('seller', 'name avatar rating phone')
+      .populate('seller', 'name avatar rating phone verification.status')
       .sort({ createdAt: -1 })
       .limit(Number(limit))
       .lean();
@@ -283,7 +283,7 @@ router.get('/stats', cache.cacheMiddleware(600), async (req, res) => {
 router.get('/:id', optionalAuth, async (req, res) => {
   try {
     const listing = await Listing.findById(req.params.id)
-      .populate('seller', 'name avatar rating salesCount phone createdAt');
+      .populate('seller', 'name avatar rating salesCount phone createdAt verification.status');
 
     if (!listing) {
       return res.status(404).json({
@@ -384,7 +384,7 @@ router.get('/:id/similar', async (req, res) => {
         { isDeleted: true, deletedAt: { $gt: twoDaysAgo } }
       ]
     })
-      .populate('seller', 'name avatar rating phone')
+      .populate('seller', 'name avatar rating phone verification.status')
       .sort({ createdAt: -1 })
       .limit(4);
 
@@ -492,7 +492,7 @@ router.post('/', protect, upload.array('images', 10), compressImages, convertToD
       rentModel
     });
 
-    await listing.populate('seller', 'name avatar rating phone');
+    await listing.populate('seller', 'name avatar rating phone verification.status');
 
     // Notify all admins by email (fire-and-forget)
     try {
@@ -589,7 +589,7 @@ router.put('/:id', protect, upload.array('images', 10), compressImages, convertT
       req.params.id,
       updateData,
       { new: true, runValidators: true }
-    ).populate('seller', 'name avatar rating phone');
+    ).populate('seller', 'name avatar rating phone verification.status');
 
     // If repost: notify admins by email
     if (wasRejected && !req.user.isAdmin) {
